@@ -15,9 +15,6 @@ if current_dir not in sys.path:
 from modules.filtros import Filtros
 from modules.operaciones_geometricas import OperacionesGeometricas
 from modules.operaciones_morfologicas import OperacionesMorfologicas
-from modules.analisis_circulos import AnalizadorCirculos
-from modules.generador_reportes import GeneradorPDF
-from modules.generador_pruebas import generar_imagenes_prueba, analizar_diferentes_formatos
 
 class MenuAplicacion:
     def __init__(self):
@@ -32,24 +29,23 @@ class MenuAplicacion:
         self.filtros = Filtros()
         self.op_geometricas = OperacionesGeometricas()
         self.op_morfologicas = OperacionesMorfologicas()
-        self.analizador = AnalizadorCirculos(self.dir_imagenes, self.dir_resultados)
         
         # Imagen activa y su ruta
         self.imagen_activa = None
         self.ruta_imagen_activa = None
         self.imagen_procesada = None
+        self.formato_imagen = None
+        self.tamaño_imagen = None
     
     def mostrar_menu_principal(self):
         """Muestra el menú principal de la aplicación"""
         while True:
             print("\n" + "="*50)
-            print(" SISTEMA DE ANÁLISIS DE CÍRCULOS EN IMÁGENES ".center(50, "="))
+            print(" SISTEMA DE PROCESAMIENTO DE IMÁGENES ".center(50, "="))
             print("="*50)
             print("\n1. Cargar imagen")
             print("2. Técnicas de procesamiento de imágenes")
-            print("3. Analizar círculos en la imagen")
-            print("4. Generar reportes")
-            print("5. Opciones avanzadas")
+            print("3. Opciones avanzadas")
             print("0. Salir")
             
             opcion = input("\nSeleccione una opción: ").strip()
@@ -60,14 +56,9 @@ class MenuAplicacion:
                 if self.verificar_imagen_cargada():
                     self.menu_procesamiento_imagen()
             elif opcion == "3":
-                if self.verificar_imagen_cargada():
-                    self.menu_analisis_circulos()
-            elif opcion == "4":
-                self.menu_reportes()
-            elif opcion == "5":
                 self.menu_opciones_avanzadas()
             elif opcion == "0":
-                print("\n¡Gracias por usar el sistema de análisis de círculos!")
+                print("\n¡Gracias por usar el sistema de procesamiento de imágenes!")
                 break
             else:
                 print("\nOpción no válida. Intente nuevamente.")
@@ -85,8 +76,7 @@ class MenuAplicacion:
         print(" CARGAR IMAGEN ".center(50, "-"))
         print("-"*50)
         print("\n1. Seleccionar imagen existente")
-        print("2. Generar imágenes de prueba")
-        print("3. Usar cámara web")
+        print("2. Usar cámara web")
         print("0. Volver al menú principal")
         
         opcion = input("\nSeleccione una opción: ").strip()
@@ -94,8 +84,6 @@ class MenuAplicacion:
         if opcion == "1":
             self.seleccionar_imagen()
         elif opcion == "2":
-            self.generar_imagenes_prueba()
-        elif opcion == "3":
             self.capturar_desde_camara()
         elif opcion == "0":
             return
@@ -108,7 +96,7 @@ class MenuAplicacion:
                   if f.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp'))]
         
         if not imagenes:
-            print("\nNo hay imágenes disponibles en el directorio. Genere algunas primero.")
+            print("\nNo hay imágenes disponibles en el directorio. Añada algunas primero.")
             return
         
         print("\nImágenes disponibles:")
@@ -124,18 +112,6 @@ class MenuAplicacion:
                 print("\nNúmero de imagen no válido.")
         except ValueError:
             print("\nPor favor, ingrese un número válido.")
-    
-    def generar_imagenes_prueba(self):
-        """Genera imágenes de prueba para análisis"""
-        cantidad = input("\nCantidad de imágenes a generar (presione Enter para usar el valor por defecto: 3): ").strip()
-        cantidad = int(cantidad) if cantidad.isdigit() else 3
-        
-        print(f"\nGenerando {cantidad} imágenes de prueba...")
-        imagenes = generar_imagenes_prueba(self.dir_imagenes, cantidad=cantidad)
-        print(f"Se generaron {len(imagenes)} imágenes de prueba en {self.dir_imagenes}.")
-        
-        if imagenes:
-            self.cargar_imagen(imagenes[0])
     
     def capturar_desde_camara(self):
         """Captura una imagen desde la cámara web"""
@@ -186,12 +162,23 @@ class MenuAplicacion:
         """Carga una imagen desde la ruta especificada"""
         try:
             self.ruta_imagen_activa = ruta_imagen
-            self.imagen_activa = self.analizador.cargar_imagen(ruta_imagen)
+            
+            # Usar OpenCV para cargar la imagen directamente
+            imagen = cv2.imread(ruta_imagen)
+            if imagen is None:
+                raise Exception(f"No se pudo cargar la imagen desde {ruta_imagen}")
+            
+            # Convertir de BGR a RGB para matplotlib
+            self.imagen_activa = cv2.cvtColor(imagen, cv2.COLOR_BGR2RGB)
             self.imagen_procesada = self.imagen_activa.copy()
             
+            # Obtener información de la imagen
+            self.tamaño_imagen = self.imagen_activa.shape
+            self.formato_imagen = os.path.splitext(ruta_imagen)[1][1:].upper()
+            
             print(f"\nImagen cargada: {os.path.basename(ruta_imagen)}")
-            print(f"Dimensiones: {self.analizador.tamaño_imagen}")
-            print(f"Formato: {self.analizador.formato_imagen}")
+            print(f"Dimensiones: {self.tamaño_imagen}")
+            print(f"Formato: {self.formato_imagen}")
             
             # Mostrar la imagen
             plt.figure(figsize=(8, 6))
@@ -202,6 +189,12 @@ class MenuAplicacion:
             
         except Exception as e:
             print(f"\nError al cargar la imagen: {e}")
+    
+    def convertir_escala_grises(self, imagen):
+        """Convierte una imagen a escala de grises"""
+        if len(imagen.shape) == 3:
+            return cv2.cvtColor(imagen, cv2.COLOR_RGB2GRAY)
+        return imagen  # Ya está en escala de grises
     
     def menu_procesamiento_imagen(self):
         """Menú para técnicas de procesamiento de imágenes"""
@@ -221,7 +214,7 @@ class MenuAplicacion:
             opcion = input("\nSeleccione una opción: ").strip()
             
             if opcion == "1":
-                self.imagen_procesada = self.analizador.convertir_escala_grises(self.imagen_activa)
+                self.imagen_procesada = self.convertir_escala_grises(self.imagen_activa)
                 self.mostrar_imagen_procesada("Escala de grises")
             elif opcion == "2":
                 self.submenu_binarizacion()
@@ -253,11 +246,11 @@ class MenuAplicacion:
         if opcion == "1":
             umbral = input("Ingrese el valor de umbral (0-255, Enter para 127): ").strip()
             umbral = int(umbral) if umbral.isdigit() else 127
-            img_gris = self.analizador.convertir_escala_grises(self.imagen_procesada)
+            img_gris = self.convertir_escala_grises(self.imagen_procesada)
             _, self.imagen_procesada = cv2.threshold(img_gris, umbral, 255, cv2.THRESH_BINARY)
             self.mostrar_imagen_procesada(f"Binarización (umbral={umbral})")
         elif opcion == "2":
-            img_gris = self.analizador.convertir_escala_grises(self.imagen_procesada)
+            img_gris = self.convertir_escala_grises(self.imagen_procesada)
             tam_bloque = input("Tamaño del bloque (impar, Enter para 11): ").strip()
             tam_bloque = int(tam_bloque) if tam_bloque.isdigit() else 11
             constante = input("Constante (Enter para 2): ").strip()
@@ -269,7 +262,7 @@ class MenuAplicacion:
             )
             self.mostrar_imagen_procesada("Binarización adaptativa")
         elif opcion == "3":
-            img_gris = self.analizador.convertir_escala_grises(self.imagen_procesada)
+            img_gris = self.convertir_escala_grises(self.imagen_procesada)
             umbral, self.imagen_procesada = cv2.threshold(
                 img_gris, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
             )
@@ -331,12 +324,12 @@ class MenuAplicacion:
             umbral2 = int(umbral2) if umbral2.isdigit() else 200
             
             # Necesitamos convertir a escala de grises primero
-            img_gris = self.analizador.convertir_escala_grises(self.imagen_procesada)
+            img_gris = self.convertir_escala_grises(self.imagen_procesada)
             self.imagen_procesada = self.filtros.detectar_bordes_canny(
                 img_gris, umbral1=umbral1, umbral2=umbral2)
             self.mostrar_imagen_procesada(f"Detección de bordes Canny (umbrales={umbral1},{umbral2})")
         elif opcion == "7":
-            img_gris = self.analizador.convertir_escala_grises(self.imagen_procesada)
+            img_gris = self.convertir_escala_grises(self.imagen_procesada)
             self.imagen_procesada = self.filtros.ecualizar_histograma(img_gris)
             self.mostrar_imagen_procesada("Histograma ecualizado")
         else:
@@ -408,7 +401,7 @@ class MenuAplicacion:
             
             # Para operaciones morfológicas necesitamos una imagen binaria o en escala de grises
             if len(self.imagen_procesada.shape) == 3:
-                img_gris = self.analizador.convertir_escala_grises(self.imagen_procesada)
+                img_gris = self.convertir_escala_grises(self.imagen_procesada)
                 _, img_bin = cv2.threshold(img_gris, 127, 255, cv2.THRESH_BINARY)
                 self.imagen_procesada = metodo(
                     img_bin, kernel_size=kernel_size, iteraciones=iteraciones, kernel_forma=kernel_forma)
@@ -418,7 +411,7 @@ class MenuAplicacion:
         else:
             # Para operaciones que no necesitan iteraciones
             if len(self.imagen_procesada.shape) == 3:
-                img_gris = self.analizador.convertir_escala_grises(self.imagen_procesada)
+                img_gris = self.convertir_escala_grises(self.imagen_procesada)
                 _, img_bin = cv2.threshold(img_gris, 127, 255, cv2.THRESH_BINARY)
                 self.imagen_procesada = metodo(img_bin, kernel_size=kernel_size, kernel_forma=kernel_forma)
             else:
@@ -434,6 +427,9 @@ class MenuAplicacion:
         print("3. Recortar imagen")
         print("4. Voltear imagen")
         print("5. Trasladar imagen")
+        print("6. Operación AND")
+        print("7. Operación OR")
+        print("8. Operación NOT")
         
         opcion = input("\nSeleccione una opción: ").strip()
         
@@ -518,8 +514,83 @@ class MenuAplicacion:
             except ValueError:
                 print("Error: Ingrese valores numéricos válidos.")
         
+        elif opcion == "6":  # Operación AND
+            print("\nPara la operación AND, primero necesita cargar una segunda imagen.")
+            self.seleccionar_segunda_imagen_operacion_logica("AND")
+            
+        elif opcion == "7":  # Operación OR
+            print("\nPara la operación OR, primero necesita cargar una segunda imagen.")
+            self.seleccionar_segunda_imagen_operacion_logica("OR")
+            
+        elif opcion == "8":  # Operación NOT
+            # Convertir a binaria si es necesario
+            if len(self.imagen_procesada.shape) == 3:
+                img_gris = self.convertir_escala_grises(self.imagen_procesada)
+                _, img_bin = cv2.threshold(img_gris, 127, 255, cv2.THRESH_BINARY)
+            else:
+                _, img_bin = cv2.threshold(self.imagen_procesada, 127, 255, cv2.THRESH_BINARY)
+                
+            self.imagen_procesada = self.op_geometricas.operacion_not(img_bin)
+            self.mostrar_imagen_procesada("Operación NOT aplicada")
+        
         else:
             print("\nOpción no válida.")
+    
+    def seleccionar_segunda_imagen_operacion_logica(self, operacion):
+        """Selecciona una segunda imagen y aplica la operación lógica especificada"""
+        imagenes = [f for f in os.listdir(self.dir_imagenes) 
+                  if f.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp'))]
+        
+        if not imagenes:
+            print("\nNo hay imágenes disponibles en el directorio para usar como segunda imagen.")
+            return
+        
+        print("\nSeleccione la segunda imagen para la operación:")
+        for i, img in enumerate(imagenes, 1):
+            print(f"{i}. {img}")
+        
+        try:
+            indice = int(input("\nSeleccione el número de imagen: ").strip()) - 1
+            if 0 <= indice < len(imagenes):
+                ruta_imagen2 = os.path.join(self.dir_imagenes, imagenes[indice])
+                
+                # Cargar la segunda imagen
+                imagen2 = cv2.imread(ruta_imagen2)
+                if imagen2 is None:
+                    raise Exception(f"No se pudo cargar la imagen desde {ruta_imagen2}")
+                imagen2 = cv2.cvtColor(imagen2, cv2.COLOR_BGR2RGB)
+                
+                # Convertir ambas imágenes a binarias si es necesario
+                if len(self.imagen_procesada.shape) == 3:
+                    img1_gris = self.convertir_escala_grises(self.imagen_procesada)
+                    _, img1_bin = cv2.threshold(img1_gris, 127, 255, cv2.THRESH_BINARY)
+                else:
+                    _, img1_bin = cv2.threshold(self.imagen_procesada, 127, 255, cv2.THRESH_BINARY)
+                
+                if len(imagen2.shape) == 3:
+                    img2_gris = self.convertir_escala_grises(imagen2)
+                    _, img2_bin = cv2.threshold(img2_gris, 127, 255, cv2.THRESH_BINARY)
+                else:
+                    _, img2_bin = cv2.threshold(imagen2, 127, 255, cv2.THRESH_BINARY)
+                
+                # Redimensionar la segunda imagen si es necesario
+                if img1_bin.shape != img2_bin.shape:
+                    img2_bin = self.op_geometricas.redimensionar_imagen(
+                        img2_bin, img1_bin.shape[1], img1_bin.shape[0])
+                
+                # Aplicar la operación lógica
+                if operacion == "AND":
+                    self.imagen_procesada = self.op_geometricas.operacion_and(img1_bin, img2_bin)
+                    self.mostrar_imagen_procesada("Operación AND aplicada")
+                elif operacion == "OR":
+                    self.imagen_procesada = self.op_geometricas.operacion_or(img1_bin, img2_bin)
+                    self.mostrar_imagen_procesada("Operación OR aplicada")
+            else:
+                print("\nNúmero de imagen no válido.")
+        except ValueError:
+            print("\nPor favor, ingrese un número válido.")
+        except Exception as e:
+            print(f"\nError al aplicar la operación: {e}")
     
     def mostrar_imagen_procesada(self, titulo="Imagen Procesada"):
         """Muestra la imagen procesada actual"""
@@ -565,148 +636,75 @@ class MenuAplicacion:
         
         except Exception as e:
             print(f"Error al guardar la imagen: {e}")
-    
-    def menu_analisis_circulos(self):
-        """Menú para analizar círculos en la imagen"""
-        if self.imagen_procesada is None:
-            self.imagen_procesada = self.imagen_activa.copy()
-        
+
+    def menu_opciones_avanzadas(self):
+        """Menú para opciones avanzadas"""
         print("\n" + "-"*50)
-        print(" ANÁLISIS DE CÍRCULOS ".center(50, "-"))
+        print(" OPCIONES AVANZADAS ".center(50, "-"))
         print("-"*50)
-        print("\n1. Detectar círculos (método de Hough)")
-        print("2. Detectar círculos (método de contornos)")
-        print("3. Análisis detallado de círculos")
-        print("4. Visualizar resultados")
+        print("\n1. Cambiar directorio de imágenes")
+        print("2. Cambiar directorio de resultados")
         print("0. Volver al menú principal")
         
         opcion = input("\nSeleccione una opción: ").strip()
         
         if opcion == "1":
-            self.detectar_circulos_hough()
+            nuevo_dir = input("Nuevo directorio de imágenes: ").strip()
+            if os.path.exists(nuevo_dir) and os.path.isdir(nuevo_dir):
+                self.dir_imagenes = nuevo_dir
+                print(f"Directorio de imágenes cambiado a: {nuevo_dir}")
+            else:
+                print("El directorio especificado no existe.")
+                
         elif opcion == "2":
-            self.detectar_circulos_contornos()
-        elif opcion == "3":
-            self.analisis_detallado_circulos()
-        elif opcion == "4":
-            self.visualizar_resultados_circulos()
+            nuevo_dir = input("Nuevo directorio de resultados: ").strip()
+            if os.path.exists(nuevo_dir) and os.path.isdir(nuevo_dir):
+                self.dir_resultados = nuevo_dir
+                print(f"Directorio de resultados cambiado a: {nuevo_dir}")
+            else:
+                crear = input("El directorio no existe. ¿Desea crearlo? (s/n): ").strip().lower()
+                if crear == 's' or crear == 'si':
+                    try:
+                        os.makedirs(nuevo_dir)
+                        self.dir_resultados = nuevo_dir
+                        print(f"Directorio de resultados creado y establecido: {nuevo_dir}")
+                    except Exception as e:
+                        print(f"Error al crear el directorio: {e}")
         elif opcion == "0":
             return
         else:
-            print("\nOpción no válida. Intente nuevamente.")
+            print("\nOpción no válida.")
+
+def main():
+    """
+    Función principal del programa de procesamiento de imágenes.
     
-    def detectar_circulos_hough(self):
-        """Detecta círculos usando el método de Hough"""
-        print("\nConfiguraciones para la detección de Hough:")
-        
-        dp = input("Resolución acumulador (Enter para 1): ").strip()
-        dp = float(dp) if dp else 1
-        
-        minDist = input("Distancia mínima entre círculos (Enter para 50): ").strip()
-        minDist = int(minDist) if minDist.isdigit() else 50
-        
-        param1 = input("Umbral para detector de bordes (Enter para 50): ").strip()
-        param1 = int(param1) if param1.isdigit() else 50
-        
-        param2 = input("Umbral para detección de centros (Enter para 30): ").strip()
-        param2 = int(param2) if param2.isdigit() else 30
-        
-        minRadius = input("Radio mínimo (Enter para 10): ").strip()
-        minRadius = int(minRadius) if minRadius.isdigit() else 10
-        
-        maxRadius = input("Radio máximo (Enter para 100): ").strip()
-        maxRadius = int(maxRadius) if maxRadius.isdigit() else 100
-        
-        # Primero preprocesamos la imagen
-        img_gris = self.analizador.convertir_escala_grises(self.imagen_procesada)
-        img_filtrada = self.filtros.aplicar_filtro_gaussiano(img_gris)
-        
-        # Detectamos los círculos
-        imagen_resultado, circulos = self.analizador.detectar_circulos_hough(
-            img_filtrada, dp=dp, minDist=minDist, param1=param1, param2=param2,
-            minRadius=minRadius, maxRadius=maxRadius
-        )
-        
-        # Actualizar imagen procesada
-        self.imagen_procesada = imagen_resultado
-        
-        # Mostrar resultados
-        self.mostrar_imagen_procesada("Círculos detectados (Hough)")
-        
-        # Mostrar información sobre los círculos detectados
-        if hasattr(self.analizador, 'circulos') and self.analizador.circulos is not None:
-            print(f"\nSe detectaron {len(self.analizador.circulos[0])} círculos.")
-            
-            if len(self.analizador.circulos[0]) > 0:
-                print("\nEstadísticas de círculos:")
-                print(f"Radio medio: {np.mean(self.analizador.radios):.2f}")
-                print(f"Área media: {np.mean(self.analizador.areas):.2f}")
-                print(f"Perímetro medio: {np.mean(self.analizador.perimetros):.2f}")
-        else:
-            print("\nNo se detectaron círculos.")
+    Inicia la interfaz de menú para el procesamiento de imágenes.
+    """
+    parser = argparse.ArgumentParser(description='Procesamiento de imágenes')
     
-    def detectar_circulos_contornos(self):
-        """Detecta círculos usando el método de contornos"""
-        print("\nConfiguraciones para la detección por contornos:")
-        
-        min_area = input("Área mínima del círculo (Enter para 100): ").strip()
-        min_area = int(min_area) if min_area.isdigit() else 100
-        
-        # Primero preprocesamos la imagen
-        img_gris = self.analizador.convertir_escala_grises(self.imagen_procesada)
-        # Reemplazar la línea problemática con una llamada directa a cv2.threshold
-        _, img_binaria = cv2.threshold(img_gris, 127, 255, cv2.THRESH_BINARY)
-        img_morfologica = self.op_morfologicas.cierre(img_binaria, kernel_size=5, iteraciones=1)
-        
-        # Detectamos los círculos
-        imagen_resultado, circulos_contornos = self.analizador.detectar_circulos_contornos(
-            img_morfologica, min_area=min_area
-        )
-        
-        # Actualizar imagen procesada
-        self.imagen_procesada = imagen_resultado
-        
-        # Mostrar resultados
-        self.mostrar_imagen_procesada("Círculos detectados (Contornos)")
-        
-        # Mostrar información sobre los círculos detectados
-        if hasattr(self.analizador, 'circulos_contornos'):
-            print(f"\nSe detectaron {len(self.analizador.circulos_contornos)} círculos.")
-            
-            if len(self.analizador.circulos_contornos) > 0:
-                print("\nEstadísticas de círculos:")
-                print(f"Radio medio: {np.mean(self.analizador.radios):1.2f}")
-                print(f"Área media: {np.mean(self.analizador.areas):.2f}")
-                print(f"Perímetro medio: {np.mean(self.analizador.perimetros):.2f}")
-        else:
-            print("\nNo se detectaron círculos.")
+    parser.add_argument('--dir-imagenes', type=str, default='images',
+                        help='Directorio donde se encuentran las imágenes')
     
-    def analisis_detallado_circulos(self):
-        """Realiza un análisis detallado de los círculos en la imagen"""
-        if not hasattr(self.analizador, 'areas') or not self.analizador.areas:
-            print("\nPrimero debe detectar círculos en la imagen usando alguno de los métodos disponibles.")
-            return
-        
-        print("\nAnálisis detallado de círculos:")
-        print(f"Número de círculos: {len(self.analizador.areas)}")
-        
-        if len(self.analizador.areas) > 0:
-            # Estadísticas de área
-            print("\nEstadísticas de ÁREA:")
-            print(f"Media: {np.mean(self.analizador.areas):.2f}")
-            print(f"Máxima: {np.max(self.analizador.areas):.2f}")
-            print(f"Mínima: {np.min(self.analizador.areas):.2f}")
-            print(f"Desviación estándar: {np.std(self.analizador.areas):.2f}")
-            
-            # Estadísticas de perímetro
-            print("\nEstadísticas de PERÍMETRO:")
-            print(f"Media: {np.mean(self.analizador.perimetros):.2f}")
-            print(f"Máxima: {np.max(self.analizador.perimetros):.2f}")
-            print(f"Mínima: {np.min(self.analizador.perimetros):.2f}")
-            print(f"Desviación estándar: {np.std(self.analizador.perimetros):.2f}")
-            
-            # Estadísticas de radio
-            print("\nEstadísticas de RADIO:")
+    parser.add_argument('--dir-resultados', type=str, default='resultados',
+                        help='Directorio donde se guardarán los resultados')
+    
+    args = parser.parse_args()
+    
+    # Crear directorios si no existen
+    os.makedirs(args.dir_imagenes, exist_ok=True)
+    os.makedirs(args.dir_resultados, exist_ok=True)
+    
+    # Iniciar la aplicación
+    app = MenuAplicacion()
+    app.dir_imagenes = args.dir_imagenes
+    app.dir_resultados = args.dir_resultados
+    
+    # Mostrar el menú principal
+    app.mostrar_menu_principal()
+
+if __name__ == "__main__":
+    main()
             print(f"Media: {np.mean(self.analizador.radios):.2f}")
             print(f"Máxima: {np.max(self.analizador.radios):.2f}")
             print(f"Mínima: {np.min(self.analizador.radios):.2f}")
