@@ -14,10 +14,15 @@ if current_dir not in sys.path:
 # Importar los módulos específicos
 from modules.filtros import Filtros
 from modules.operaciones_geometricas import OperacionesGeometricas
+from modules.operaciones_aritmeticas import OperacionesAritmeticas
 from modules.operaciones_morfologicas import OperacionesMorfologicas
+from modules.segmentacion import Segmentacion  # Nuevo módulo de segmentación
+from modules.operaciones_logicas import OperacionesLogicas  # Nuevo módulo de operaciones lógicas
+from modules.analisis_propiedades import AnalisisPropiedades  # Nuevo módulo de análisis de propiedades
+
 class MenuAplicacion:
     def __init__(self):
-        self.dir_imagenes = 'images'
+        self.dir_imagenes = 'imgs'
         self.dir_resultados = 'resultados'
         
         # Crear directorios si no existen
@@ -27,7 +32,11 @@ class MenuAplicacion:
         # Inicializar clases necesarias
         self.filtros = Filtros()
         self.op_geometricas = OperacionesGeometricas()
+        self.op_aritmeticas = OperacionesAritmeticas()
         self.op_morfologicas = OperacionesMorfologicas()
+        self.op_logicas = OperacionesLogicas()  # Operaciones lógicas
+        self.segmentacion = Segmentacion()  # Nueva clase de segmentación
+        self.analisis_prop = AnalisisPropiedades()  # Nueva clase de análisis de propiedades
         
         # Imagen activa y su ruta
         self.imagen_activa = None
@@ -45,6 +54,8 @@ class MenuAplicacion:
             print("\n1. Cargar imagen")
             print("2. Técnicas de procesamiento de imágenes")
             print("3. Opciones avanzadas")
+            print("4. Detección de copas de árboles")
+            print("5. Análisis de propiedades")  # Nueva opción en el menú principal
             print("0. Salir")
             
             opcion = input("\nSeleccione una opción: ").strip()
@@ -56,6 +67,12 @@ class MenuAplicacion:
                     self.menu_procesamiento_imagen()
             elif opcion == "3":
                 self.menu_opciones_avanzadas()
+            elif opcion == "4":  # Detección de copas de árboles
+                if self.verificar_imagen_cargada():
+                    self.menu_deteccion_copas_arboles()
+            elif opcion == "5":  # Análisis de propiedades
+                if self.verificar_imagen_cargada():
+                    self.menu_analisis_propiedades()
             elif opcion == "0":
                 print("\n¡Gracias por usar el sistema de procesamiento de imágenes!")
                 break
@@ -206,8 +223,12 @@ class MenuAplicacion:
             print("3. Aplicar filtros")
             print("4. Operaciones morfológicas")
             print("5. Operaciones geométricas")
-            print("6. Restaurar imagen original")
-            print("7. Guardar imagen procesada")
+            print("6. Operaciones aritméticas")
+            print("7. Operaciones lógicas")
+            print("8. Segmentación de imágenes")  # Nuevo menú para segmentación
+            print("9. Extraer canales RGB")  # Nueva opción para extraer canales RGB
+            print("10. Restaurar imagen original")
+            print("11. Guardar imagen procesada")
             print("0. Volver al menú principal")
             
             opcion = input("\nSeleccione una opción: ").strip()
@@ -224,9 +245,17 @@ class MenuAplicacion:
             elif opcion == "5":
                 self.submenu_operaciones_geometricas()
             elif opcion == "6":
+                self.submenu_operaciones_aritmeticas()
+            elif opcion == "7":
+                self.submenu_operaciones_logicas()
+            elif opcion == "8":
+                self.submenu_segmentacion()  # Nuevo submenú para segmentación
+            elif opcion == "9":
+                self.submenu_canales_rgb()  # Nuevo submenú para extraer canales RGB
+            elif opcion == "10":
                 self.imagen_procesada = self.imagen_activa.copy()
                 self.mostrar_imagen_procesada("Imagen Original")
-            elif opcion == "7":
+            elif opcion == "11":
                 self.guardar_imagen_procesada()
             elif opcion == "0":
                 break
@@ -344,12 +373,19 @@ class MenuAplicacion:
         print("5. Gradiente morfológico")
         print("6. Top Hat")
         print("7. Black Hat")
+        print("8. Eliminar ruido en binaria")
+        print("9. Extracción de contornos morfológicos")
+        print("10. Esqueletización")
+        print("11. Relleno de huecos internos")
+        print("0. Volver")
         
         opcion = input("\nSeleccione una opción: ").strip()
         operacion = ""
         metodo = None
         
-        if opcion == "1":
+        if opcion == "0":
+            return
+        elif opcion == "1":
             metodo = self.op_morfologicas.erosion
             operacion = "erosion"
         elif opcion == "2":
@@ -370,6 +406,72 @@ class MenuAplicacion:
         elif opcion == "7":
             metodo = self.op_morfologicas.black_hat
             operacion = "black_hat"
+        elif opcion == "8":
+            # Eliminar ruido en imagen binaria
+            print("\nSeleccione el método para eliminar ruido:")
+            print("1. Apertura (elimina pequeños objetos)")
+            print("2. Cierre (rellena pequeños huecos)")
+            
+            metodo_ruido = input("\nSeleccione una opción (Enter para apertura): ").strip()
+            metodo_elegido = "apertura" if metodo_ruido != "2" else "cierre"
+            
+            kernel_size = input("Tamaño del kernel (impar, Enter para 5): ").strip()
+            kernel_size = int(kernel_size) if kernel_size.isdigit() else 5
+            
+            print("Forma del kernel:")
+            print("1. Rectángulo")
+            print("2. Elipse")
+            print("3. Cruz")
+            forma_opcion = input("\nSeleccione una opción: ").strip()
+            
+            if forma_opcion == "2":
+                kernel_forma = "elipse"
+            elif forma_opcion == "3":
+                kernel_forma = "cruz"
+            else:
+                kernel_forma = "rectangulo"
+            
+            self.imagen_procesada = self.op_morfologicas.eliminar_ruido_binaria(
+                self.imagen_procesada, metodo_elegido, kernel_size, kernel_forma)
+            
+            self.mostrar_imagen_procesada(f"Eliminación de ruido con {metodo_elegido} (kernel={kernel_size})")
+            return
+            
+        elif opcion == "9":
+            # Extracción de contornos morfológicos
+            kernel_size = input("Tamaño del kernel (impar, Enter para 3): ").strip()
+            kernel_size = int(kernel_size) if kernel_size.isdigit() else 3
+            
+            print("Forma del kernel:")
+            print("1. Rectángulo")
+            print("2. Elipse")
+            print("3. Cruz")
+            forma_opcion = input("\nSeleccione una opción: ").strip()
+            
+            if forma_opcion == "2":
+                kernel_forma = "elipse"
+            elif forma_opcion == "3":
+                kernel_forma = "cruz"
+            else:
+                kernel_forma = "rectangulo"
+            
+            self.imagen_procesada = self.op_morfologicas.extraer_contornos_morfologicos(
+                self.imagen_procesada, kernel_size, kernel_forma)
+            
+            self.mostrar_imagen_procesada(f"Contornos morfológicos (kernel={kernel_size})")
+            return
+            
+        elif opcion == "10":
+            # Esqueletización
+            self.imagen_procesada = self.op_morfologicas.esqueletizacion(self.imagen_procesada)
+            self.mostrar_imagen_procesada("Esqueletización")
+            return
+            
+        elif opcion == "11":
+            # Relleno de huecos internos
+            self.imagen_procesada = self.op_morfologicas.rellenar_huecos(self.imagen_procesada)
+            self.mostrar_imagen_procesada("Relleno de huecos internos")
+            return
         else:
             print("\nOpción no válida.")
             return
@@ -426,9 +528,6 @@ class MenuAplicacion:
         print("3. Recortar imagen")
         print("4. Voltear imagen")
         print("5. Trasladar imagen")
-        print("6. Operación AND")
-        print("7. Operación OR")
-        print("8. Operación NOT")
         
         opcion = input("\nSeleccione una opción: ").strip()
         
@@ -513,25 +612,6 @@ class MenuAplicacion:
             except ValueError:
                 print("Error: Ingrese valores numéricos válidos.")
         
-        elif opcion == "6":  # Operación AND
-            print("\nPara la operación AND, primero necesita cargar una segunda imagen.")
-            self.seleccionar_segunda_imagen_operacion_logica("AND")
-            
-        elif opcion == "7":  # Operación OR
-            print("\nPara la operación OR, primero necesita cargar una segunda imagen.")
-            self.seleccionar_segunda_imagen_operacion_logica("OR")
-            
-        elif opcion == "8":  # Operación NOT
-            # Convertir a binaria si es necesario
-            if len(self.imagen_procesada.shape) == 3:
-                img_gris = self.convertir_escala_grises(self.imagen_procesada)
-                _, img_bin = cv2.threshold(img_gris, 127, 255, cv2.THRESH_BINARY)
-            else:
-                _, img_bin = cv2.threshold(self.imagen_procesada, 127, 255, cv2.THRESH_BINARY)
-                
-            self.imagen_procesada = self.op_geometricas.operacion_not(img_bin)
-            self.mostrar_imagen_procesada("Operación NOT aplicada")
-        
         else:
             print("\nOpción no válida.")
     
@@ -579,11 +659,14 @@ class MenuAplicacion:
                 
                 # Aplicar la operación lógica
                 if operacion == "AND":
-                    self.imagen_procesada = self.op_geometricas.operacion_and(img1_bin, img2_bin)
+                    self.imagen_procesada = self.op_logicas.operacion_and(img1_bin, img2_bin)
                     self.mostrar_imagen_procesada("Operación AND aplicada")
                 elif operacion == "OR":
-                    self.imagen_procesada = self.op_geometricas.operacion_or(img1_bin, img2_bin)
+                    self.imagen_procesada = self.op_logicas.operacion_or(img1_bin, img2_bin)
                     self.mostrar_imagen_procesada("Operación OR aplicada")
+                elif operacion == "XOR":
+                    self.imagen_procesada = self.op_logicas.operacion_xor(img1_bin, img2_bin)
+                    self.mostrar_imagen_procesada("Operación XOR aplicada")
             else:
                 print("\nNúmero de imagen no válido.")
         except ValueError:
@@ -636,6 +719,189 @@ class MenuAplicacion:
         except Exception as e:
             print(f"Error al guardar la imagen: {e}")
 
+    def submenu_segmentacion(self):
+        """Submenú para técnicas de segmentación de imágenes"""
+        print("\n" + "-"*50)
+        print(" SEGMENTACIÓN DE IMÁGENES ".center(50, "-"))
+        print("-"*50)
+        print("\n1. Umbralización simple")
+        print("2. Umbralización adaptativa")
+        print("3. Detector de bordes (Canny)")
+        print("4. Detección de contornos")
+        print("5. Segmentación K-means")
+        print("6. Segmentación Watershed")
+        print("7. Crecimiento de regiones")
+        print("8. Segmentación por color (HSV)")
+        print("9. Detección de copas de árboles")  # Nueva opción
+        print("0. Volver al menú de procesamiento")
+        
+        opcion = input("\nSeleccione una opción: ").strip()
+        
+        if opcion == "1":
+            umbral = input("Ingrese el valor de umbral (0-255, Enter para 127): ").strip()
+            umbral = int(umbral) if umbral.isdigit() else 127
+            self.imagen_procesada = self.segmentacion.umbral_simple(self.imagen_procesada, umbral)
+            self.mostrar_imagen_procesada(f"Umbralización Simple (umbral={umbral})")
+            
+        elif opcion == "2":
+            tam_bloque = input("Tamaño del bloque (impar, Enter para 11): ").strip()
+            tam_bloque = int(tam_bloque) if tam_bloque.isdigit() else 11
+            constante = input("Constante (Enter para 2): ").strip()
+            constante = int(constante) if constante.isdigit() else 2
+            
+            print("Tipo de umbral adaptativo:")
+            print("1. Media (MEAN)")
+            print("2. Gaussiano (GAUSSIAN)")
+            tipo_opc = input("Seleccione una opción (Enter para MEAN): ").strip()
+            tipo = "GAUSSIAN" if tipo_opc == "2" else "MEAN"
+            
+            self.imagen_procesada = self.segmentacion.umbral_adaptativo(
+                self.imagen_procesada, tam_bloque, constante, tipo)
+            self.mostrar_imagen_procesada(f"Umbralización Adaptativa ({tipo})")
+            
+        elif opcion == "3":
+            umbral1 = input("Umbral inferior (Enter para 100): ").strip()
+            umbral1 = int(umbral1) if umbral1.isdigit() else 100
+            umbral2 = input("Umbral superior (Enter para 200): ").strip()
+            umbral2 = int(umbral2) if umbral2.isdigit() else 200
+            
+            self.imagen_procesada = self.segmentacion.detector_canny(
+                self.imagen_procesada, umbral1, umbral2)
+            self.mostrar_imagen_procesada(f"Detector de Bordes Canny ({umbral1}, {umbral2})")
+            
+        elif opcion == "4":
+            umbral = input("Valor de umbral para la binarización (0-255, Enter para 127): ").strip()
+            umbral = int(umbral) if umbral.isdigit() else 127
+            
+            self.imagen_procesada = self.segmentacion.deteccion_contornos(self.imagen_procesada, umbral)
+            self.mostrar_imagen_procesada("Detección de Contornos")
+            
+        elif opcion == "5":
+            k = input("Número de clusters (Enter para 2): ").strip()
+            k = int(k) if k.isdigit() else 2
+            
+            self.imagen_procesada = self.segmentacion.kmeans_segmentacion(self.imagen_procesada, k)
+            self.mostrar_imagen_procesada(f"Segmentación K-means (k={k})")
+            
+        elif opcion == "6":
+            self.imagen_procesada = self.segmentacion.watershed_segmentacion(self.imagen_procesada)
+            self.mostrar_imagen_procesada("Segmentación Watershed")
+            
+        elif opcion == "7":
+            print("\nDefina puntos semilla (deje en blanco para usar puntos automáticos):")
+            try:
+                semillas = []
+                num_semillas = input("Número de semillas (Enter para usar automáticas): ").strip()
+                
+                if num_semillas and num_semillas.isdigit():
+                    num_semillas = int(num_semillas)
+                    alto, ancho = self.imagen_procesada.shape[:2]
+                    
+                    for i in range(num_semillas):
+                        x = input(f"Coordenada X para semilla {i+1} (0-{ancho-1}): ").strip()
+                        y = input(f"Coordenada Y para semilla {i+1} (0-{alto-1}): ").strip()
+                        
+                        if x.isdigit() and y.isdigit():
+                            x, y = int(x), int(y)
+                            if 0 <= x < ancho and 0 <= y < alto:
+                                semillas.append((y, x))  # Nota: OpenCV usa (y, x) para coordenadas
+                
+                umbral = input("Umbral de similitud (Enter para 20): ").strip()
+                umbral = int(umbral) if umbral.isdigit() else 20
+                
+                semillas = semillas if semillas else None
+                self.imagen_procesada = self.segmentacion.crecimiento_regiones(
+                    self.imagen_procesada, semillas, umbral)
+                self.mostrar_imagen_procesada("Segmentación por Crecimiento de Regiones")
+                
+            except Exception as e:
+                print(f"Error al aplicar crecimiento de regiones: {e}")
+                
+        elif opcion == "8":
+            # Explicar rangos HSV a usuario
+            print("\nRangos HSV para segmentación de color:")
+            print("Tono (Hue): 0-179, donde 0-30 y 150-179 son rojos, 30-90 es verde, 90-150 es azul")
+            print("Saturación (Saturation): 0-255, con 0 siendo blanco/gris y 255 colores puros")
+            print("Valor (Value): 0-255, con 0 siendo negro y 255 brillante")
+            
+            try:
+                hue_min = input("Tono mínimo (0-179, Enter para 0): ").strip()
+                hue_min = int(hue_min) if hue_min.isdigit() else 0
+                hue_max = input("Tono máximo (0-179, Enter para 30): ").strip()
+                hue_max = int(hue_max) if hue_max.isdigit() else 30
+                
+                sat_min = input("Saturación mínima (0-255, Enter para 50): ").strip()
+                sat_min = int(sat_min) if sat_min.isdigit() else 50
+                sat_max = input("Saturación máxima (0-255, Enter para 255): ").strip()
+                sat_max = int(sat_max) if sat_max.isdigit() else 255
+                
+                val_min = input("Valor mínimo (0-255, Enter para 50): ").strip()
+                val_min = int(val_min) if val_min.isdigit() else 50
+                val_max = input("Valor máximo (0-255, Enter para 255): ").strip()
+                val_max = int(val_max) if val_max.isdigit() else 255
+                
+                self.imagen_procesada = self.segmentacion.segmentar_color_hsv(
+                    self.imagen_procesada, hue_min, hue_max, sat_min, val_min, sat_max, val_max)
+                self.mostrar_imagen_procesada(f"Segmentación por Color HSV (Tono: {hue_min}-{hue_max})")
+                
+            except Exception as e:
+                print(f"Error al aplicar segmentación de color: {e}")
+                
+        elif opcion == "9":
+            print("\nOpciones para detección de copas de árboles:")
+            print("1. Por color (HSV)")
+            print("2. Por clustering (K-means)")
+            print("3. Por regiones (Watershed)")
+            metodo_opc = input("Seleccione el método (Enter para HSV): ").strip()
+            
+            if metodo_opc == "2":
+                metodo = "kmeans"
+                k = input("Número de clusters (Enter para 3): ").strip()
+                k = int(k) if k.isdigit() else 3
+                params = {'k': k}
+            elif metodo_opc == "3":
+                metodo = "watershed"
+                params = {}
+            else:
+                metodo = "hsv"
+                print("\nRangos para detección de verde (copas de árboles):")
+                print("Tono (Hue): típicamente 35-85 para verde")
+                hue_min = input("Tono mínimo (Enter para 35): ").strip()
+                hue_min = int(hue_min) if hue_min.isdigit() else 35
+                hue_max = input("Tono máximo (Enter para 85): ").strip()
+                hue_max = int(hue_max) if hue_max.isdigit() else 85
+                
+                sat_min = input("Saturación mínima (Enter para 30): ").strip()
+                sat_min = int(sat_min) if sat_min.isdigit() else 30
+                
+                params = {
+                    'hue_min': hue_min,
+                    'hue_max': hue_max,
+                    'sat_min': sat_min
+                }
+            
+            try:
+                img_contornos, mascara = self.segmentacion.detectar_copas_arboles(
+                    self.imagen_procesada, metodo, params)
+                
+                # Mostrar resultado con contornos
+                self.imagen_procesada = img_contornos
+                self.mostrar_imagen_procesada(f"Detección de copas de árboles ({metodo})")
+                
+                # Opción para ver solo la máscara
+                ver_mascara = input("\n¿Desea ver la máscara de segmentación? (s/n): ").lower()
+                if ver_mascara == 's' or ver_mascara == 'si':
+                    self.imagen_procesada = mascara
+                    self.mostrar_imagen_procesada("Máscara de copas de árboles")
+                    
+            except Exception as e:
+                print(f"Error al detectar copas de árboles: {e}")
+            
+        elif opcion == "0":
+            return
+        else:
+            print("\nOpción no válida. Por favor, intente de nuevo.")
+    
     def menu_opciones_avanzadas(self):
         """Menú para opciones avanzadas"""
         print("\n" + "-"*50)
@@ -673,6 +939,490 @@ class MenuAplicacion:
             return
         else:
             print("\nOpción no válida.")
+    
+    def submenu_operaciones_logicas(self):
+        """Submenú para operaciones lógicas"""
+        print("\nOperaciones lógicas:")
+        print("1. Operación AND")
+        print("2. Operación OR")
+        print("3. Operación NOT")
+        print("4. Operación XOR")
+        print("0. Volver")
+        
+        opcion = input("\nSeleccione una opción: ").strip()
+        
+        if opcion == "1":  # Operación AND
+            print("\nPara la operación AND, primero necesita cargar una segunda imagen.")
+            self.seleccionar_segunda_imagen_operacion_logica("AND")
+        
+        elif opcion == "2":  # Operación OR
+            print("\nPara la operación OR, primero necesita cargar una segunda imagen.")
+            self.seleccionar_segunda_imagen_operacion_logica("OR")
+        
+        elif opcion == "3":  # Operación NOT
+            # Convertir a binaria si es necesario
+            if len(self.imagen_procesada.shape) == 3:
+                img_gris = self.convertir_escala_grises(self.imagen_procesada)
+                _, img_bin = cv2.threshold(img_gris, 127, 255, cv2.THRESH_BINARY)
+            else:
+                _, img_bin = cv2.threshold(self.imagen_procesada, 127, 255, cv2.THRESH_BINARY)
+                
+            self.imagen_procesada = self.op_logicas.operacion_not(img_bin)
+            self.mostrar_imagen_procesada("Operación NOT aplicada")
+            
+        elif opcion == "4":  # Operación XOR
+            print("\nPara la operación XOR, primero necesita cargar una segunda imagen.")
+            self.seleccionar_segunda_imagen_operacion_logica("XOR")
+            
+        elif opcion == "0":
+            return
+        else:
+            print("\nOpción no válida. Intente nuevamente.")
+    
+    def seleccionar_imagen_secundaria(self):
+        """Permite seleccionar una imagen secundaria para operaciones que requieren dos imágenes"""
+        imagenes = [f for f in os.listdir(self.dir_imagenes) 
+                  if f.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp'))]
+        
+        if not imagenes:
+            print("\nNo hay imágenes disponibles en el directorio. Añada algunas primero.")
+            return None
+        
+        print("\nSeleccione la segunda imagen para la operación:")
+        for i, img in enumerate(imagenes, 1):
+            print(f"{i}. {img}")
+        
+        try:
+            indice = int(input("\nSeleccione el número de imagen: ").strip()) - 1
+            if 0 <= indice < len(imagenes):
+                ruta_imagen = os.path.join(self.dir_imagenes, imagenes[indice])
+                return ruta_imagen
+            else:
+                print("\nNúmero de imagen no válido.")
+                return None
+        except ValueError:
+            print("\nPor favor, ingrese un número válido.")
+            return None
+            
+    def submenu_operaciones_aritmeticas(self):
+        """Submenú para operaciones aritméticas"""
+        print("\nOperaciones aritméticas:")
+        print("1. Suma de imágenes")
+        print("2. Resta de imágenes")
+        print("3. Multiplicación de imágenes")
+        print("4. División de imágenes")
+        print("5. Ajustar brillo")
+        print("6. Ajustar contraste")
+        print("0. Volver")
+        
+        opcion = input("\nSeleccione una opción: ").strip()
+        
+        if opcion == "1":
+            # Código para seleccionar segunda imagen
+            segunda_ruta = self.seleccionar_imagen_secundaria()
+            if segunda_ruta:
+                try:
+                    segunda_imagen = cv2.imread(segunda_ruta)
+                    if segunda_imagen is None:
+                        raise ValueError("No se pudo cargar la imagen.")
+                    
+                    # Convertir a RGB si la imagen activa está en RGB
+                    if len(self.imagen_procesada.shape) == 3 and len(segunda_imagen.shape) == 3:
+                        segunda_imagen = cv2.cvtColor(segunda_imagen, cv2.COLOR_BGR2RGB)
+                    
+                    self.imagen_procesada = self.op_aritmeticas.suma_imagenes(
+                        self.imagen_procesada, segunda_imagen)
+                    self.mostrar_imagen_procesada("Suma de imágenes")
+                except Exception as e:
+                    print(f"Error al sumar imágenes: {e}")
+        
+        elif opcion == "2":
+            # Código para seleccionar segunda imagen
+            segunda_ruta = self.seleccionar_imagen_secundaria()
+            if segunda_ruta:
+                try:
+                    segunda_imagen = cv2.imread(segunda_ruta)
+                    if segunda_imagen is None:
+                        raise ValueError("No se pudo cargar la imagen.")
+                    
+                    # Convertir a RGB si la imagen activa está en RGB
+                    if len(self.imagen_procesada.shape) == 3 and len(segunda_imagen.shape) == 3:
+                        segunda_imagen = cv2.cvtColor(segunda_imagen, cv2.COLOR_BGR2RGB)
+                    
+                    self.imagen_procesada = self.op_aritmeticas.resta_imagenes(
+                        self.imagen_procesada, segunda_imagen)
+                    self.mostrar_imagen_procesada("Resta de imágenes")
+                except Exception as e:
+                    print(f"Error al restar imágenes: {e}")
+        
+        elif opcion == "3":
+            # Código para seleccionar segunda imagen
+            segunda_ruta = self.seleccionar_imagen_secundaria()
+            if segunda_ruta:
+                try:
+                    segunda_imagen = cv2.imread(segunda_ruta)
+                    if segunda_imagen is None:
+                        raise ValueError("No se pudo cargar la imagen.")
+                    
+                    # Convertir a RGB si la imagen activa está en RGB
+                    if len(self.imagen_procesada.shape) == 3 and len(segunda_imagen.shape) == 3:
+                        segunda_imagen = cv2.cvtColor(segunda_imagen, cv2.COLOR_BGR2RGB)
+                    
+                    self.imagen_procesada = self.op_aritmeticas.multiplicacion_imagenes(
+                        self.imagen_procesada, segunda_imagen)
+                    self.mostrar_imagen_procesada("Multiplicación de imágenes")
+                except Exception as e:
+                    print(f"Error al multiplicar imágenes: {e}")
+        
+        elif opcion == "4":
+            # Código para seleccionar segunda imagen
+            segunda_ruta = self.seleccionar_imagen_secundaria()
+            if segunda_ruta:
+                try:
+                    segunda_imagen = cv2.imread(segunda_ruta)
+                    if segunda_imagen is None:
+                        raise ValueError("No se pudo cargar la imagen.")
+                    
+                    # Convertir a RGB si la imagen activa está en RGB
+                    if len(self.imagen_procesada.shape) == 3 and len(segunda_imagen.shape) == 3:
+                        segunda_imagen = cv2.cvtColor(segunda_imagen, cv2.COLOR_BGR2RGB)
+                    
+                    self.imagen_procesada = self.op_aritmeticas.division_imagenes(
+                        self.imagen_procesada, segunda_imagen)
+                    self.mostrar_imagen_procesada("División de imágenes")
+                except Exception as e:
+                    print(f"Error al dividir imágenes: {e}")
+        
+        elif opcion == "5":
+            # Ajustar brillo
+            factor = input("Factor de brillo (>1 para aumentar, <1 para disminuir, Enter para 1.5): ").strip()
+            try:
+                factor = float(factor) if factor else 1.5
+                if factor <= 0:
+                    print("Error: El factor debe ser mayor que 0.")
+                    return
+                
+                self.imagen_procesada = self.op_aritmeticas.ajustar_brillo(
+                    self.imagen_procesada, factor)
+                self.mostrar_imagen_procesada(f"Brillo ajustado (factor: {factor})")
+            except ValueError:
+                print("Error: Ingrese un valor numérico válido.")
+        
+        elif opcion == "6":
+            # Ajustar contraste
+            factor = input("Factor de contraste (>1 para aumentar, <1 para disminuir, Enter para 1.5): ").strip()
+            try:
+                factor = float(factor) if factor else 1.5
+                if factor <= 0:
+                    print("Error: El factor debe ser mayor que 0.")
+                    return
+                
+                self.imagen_procesada = self.op_aritmeticas.ajustar_contraste(
+                    self.imagen_procesada, factor)
+                self.mostrar_imagen_procesada(f"Contraste ajustado (factor: {factor})")
+            except ValueError:
+                print("Error: Ingrese un valor numérico válido.")
+        
+        elif opcion == "0":
+            return
+        else:
+            print("\nOpción no válida. Intente nuevamente.")
+            
+    def submenu_canales_rgb(self):
+        """Submenú para extracción de canales RGB"""
+        print("\n" + "-"*50)
+        print(" EXTRACCIÓN DE CANALES RGB ".center(50, "-"))
+        print("-"*50)
+        print("\n1. Extraer canal Rojo")
+        print("2. Extraer canal Verde")
+        print("3. Extraer canal Azul")
+        print("4. Mostrar todos los canales")
+        print("0. Volver")
+        
+        opcion = input("\nSeleccione una opción: ").strip()
+        
+        # Verificar que la imagen esté en RGB
+        if len(self.imagen_procesada.shape) != 3 or self.imagen_procesada.shape[2] != 3:
+            print("\nError: La imagen debe estar en formato RGB para extraer canales.")
+            return
+        
+        # Separar los canales (en formato RGB)
+        b, g, r = cv2.split(self.imagen_procesada)
+        
+        if opcion == "1":  # Canal Rojo
+            # Crear una imagen con solo el canal rojo
+            imagen_roja = np.zeros_like(self.imagen_procesada)
+            imagen_roja[:, :, 0] = r  # El rojo es el primer canal en RGB
+            self.imagen_procesada = imagen_roja
+            self.mostrar_imagen_procesada("Canal Rojo")
+        
+        elif opcion == "2":  # Canal Verde
+            # Crear una imagen con solo el canal verde
+            imagen_verde = np.zeros_like(self.imagen_procesada)
+            imagen_verde[:, :, 1] = g  # El verde es el segundo canal en RGB
+            self.imagen_procesada = imagen_verde
+            self.mostrar_imagen_procesada("Canal Verde")
+        
+        elif opcion == "3":  # Canal Azul
+            # Crear una imagen con solo el canal azul
+            imagen_azul = np.zeros_like(self.imagen_procesada)
+            imagen_azul[:, :, 2] = b  # El azul es el tercer canal en RGB
+            self.imagen_procesada = imagen_azul
+            self.mostrar_imagen_procesada("Canal Azul")
+        
+        elif opcion == "4":  # Mostrar todos los canales
+            # Crear imágenes para cada canal
+            imagen_roja = np.zeros_like(self.imagen_procesada)
+            imagen_roja[:, :, 0] = r
+            
+            imagen_verde = np.zeros_like(self.imagen_procesada)
+            imagen_verde[:, :, 1] = g
+            
+            imagen_azul = np.zeros_like(self.imagen_procesada)
+            imagen_azul[:, :, 2] = b
+            
+            # Mostrar los tres canales
+            plt.figure(figsize=(15, 5))
+            
+            plt.subplot(1, 3, 1)
+            plt.imshow(imagen_roja)
+            plt.title("Canal Rojo")
+            plt.axis('off')
+            
+            plt.subplot(1, 3, 2)
+            plt.imshow(imagen_verde)
+            plt.title("Canal Verde")
+            plt.axis('off')
+            
+            plt.subplot(1, 3, 3)
+            plt.imshow(imagen_azul)
+            plt.title("Canal Azul")
+            plt.axis('off')
+            
+            plt.tight_layout()
+            plt.show(block=False)
+            
+            # Preguntar cuál canal mantener como imagen procesada
+            canal = input("\n¿Qué canal desea mantener como imagen procesada? (R/G/B/O para original): ").strip().upper()
+            
+            if canal == 'R':
+                self.imagen_procesada = imagen_roja
+                self.mostrar_imagen_procesada("Canal Rojo")
+            elif canal == 'G':
+                self.imagen_procesada = imagen_verde
+                self.mostrar_imagen_procesada("Canal Verde")
+            elif canal == 'B':
+                self.imagen_procesada = imagen_azul
+                self.mostrar_imagen_procesada("Canal Azul")
+            else:
+                # Mantener la imagen original
+                pass
+        
+        elif opcion == "0":
+            return
+        else:
+            print("\nOpción no válida. Intente nuevamente.")
+    
+    def menu_deteccion_copas_arboles(self):
+        """Menú para detección de copas de árboles"""
+        print("\n" + "-"*50)
+        print(" DETECCIÓN DE COPAS DE ÁRBOLES ".center(50, "-"))
+        print("-"*50)
+        
+        print("\nSeleccione el método de detección:")
+        print("1. Por color (HSV)")
+        print("2. Por clustering (K-means)")
+        print("3. Por regiones (Watershed)")
+        print("0. Volver al menú principal")
+        
+        opcion = input("\nSeleccione una opción: ").strip()
+        
+        if opcion == "0":
+            return
+        
+        metodo = None
+        params = {}
+        
+        if opcion == "1":
+            metodo = "hsv"
+            print("\nRangos para detección de verde (copas de árboles):")
+            print("Tono (Hue): típicamente 35-85 para verde")
+            hue_min = input("Tono mínimo (Enter para 35): ").strip()
+            hue_min = int(hue_min) if hue_min.isdigit() else 35
+            hue_max = input("Tono máximo (Enter para 85): ").strip()
+            hue_max = int(hue_max) if hue_max.isdigit() else 85
+            
+            sat_min = input("Saturación mínima (Enter para 30): ").strip()
+            sat_min = int(sat_min) if sat_min.isdigit() else 30
+            
+            val_min = input("Valor mínimo (Enter para 30): ").strip()
+            val_min = int(val_min) if val_min.isdigit() else 30
+            
+            params = {
+                'hue_min': hue_min,
+                'hue_max': hue_max,
+                'sat_min': sat_min,
+                'val_min': val_min
+            }
+            
+        elif opcion == "2":
+            metodo = "kmeans"
+            k = input("Número de clusters (Enter para 3): ").strip()
+            k = int(k) if k.isdigit() else 3
+            params = {'k': k}
+            
+        elif opcion == "3":
+            metodo = "watershed"
+            
+        else:
+            print("\nOpción no válida. Volviendo al menú principal.")
+            return
+            
+        try:
+            # Aplicar detección de copas de árboles
+            img_contornos, mascara = self.segmentacion.detectar_copas_arboles(
+                self.imagen_activa, metodo, params)
+            
+            # Mostrar resultado con contornos
+            self.imagen_procesada = img_contornos
+            self.mostrar_imagen_procesada(f"Detección de copas de árboles ({metodo})")
+            
+            # Opción para ver también la máscara
+            ver_mascara = input("\n¿Desea ver la máscara de segmentación? (s/n): ").lower()
+            if ver_mascara == 's' or ver_mascara == 'si':
+                self.imagen_procesada = mascara
+                self.mostrar_imagen_procesada("Máscara de copas de árboles")
+            
+            # Opción para guardar los resultados
+            guardar = input("\n¿Desea guardar los resultados? (s/n): ").lower()
+            if guardar == 's' or guardar == 'si':
+                self.guardar_imagen_procesada()
+                
+        except Exception as e:
+            print(f"\nError al detectar copas de árboles: {e}")
+    
+    def menu_analisis_propiedades(self):
+        """Menú para análisis de propiedades (regionprops)"""
+        print("\n" + "-"*50)
+        print(" ANÁLISIS DE PROPIEDADES (REGIONPROPS) ".center(50, "-"))
+        print("-"*50)
+        
+        print("\nSeleccione el tipo de análisis:")
+        print("1. Identificación de regiones conectadas")
+        print("2. Cálculo de área de objetos")
+        print("3. Cálculo de perímetro de objetos")
+        print("4. Detección de centroides")
+        print("5. Orientación de objetos")
+        print("6. Bounding box de objetos")
+        print("7. Extracción de múltiples propiedades simultáneas")
+        print("0. Volver al menú principal")
+        
+        opcion = input("\nSeleccione una opción: ").strip()
+        
+        if opcion == "0":
+            return
+        
+        # Para la mayoría de análisis necesitaremos un umbral y un tamaño mínimo de objeto
+        umbral = input("Umbral para binarización (0-255, Enter para 127): ").strip()
+        umbral = int(umbral) if umbral.isdigit() else 127
+        
+        min_area = input("Área mínima de objetos (Enter para 100): ").strip()
+        min_area = int(min_area) if min_area.isdigit() else 100
+        
+        try:
+            if opcion == "1":  # Identificación de regiones conectadas
+                conectividad = input("Conectividad (4 u 8, Enter para 8): ").strip()
+                conectividad = int(conectividad) if conectividad in ["4", "8"] else 8
+                
+                img_resultado, num_regiones = self.analisis_prop.identificar_regiones_conectadas(
+                    self.imagen_activa, umbral=umbral, conectividad=conectividad)
+                
+                self.imagen_procesada = img_resultado
+                self.mostrar_imagen_procesada(f"Regiones conectadas (Total: {num_regiones})")
+                
+            elif opcion == "2":  # Cálculo de área de objetos
+                img_resultado, areas = self.analisis_prop.calcular_area_objetos(
+                    self.imagen_activa, umbral=umbral, min_area=min_area)
+                
+                self.imagen_procesada = img_resultado
+                self.mostrar_imagen_procesada(f"Áreas de objetos (Total: {len(areas)})")
+                
+                if areas:
+                    print("\nÁreas de objetos detectados:")
+                    for i, area in enumerate(areas, 1):
+                        print(f"Objeto #{i}: {int(area)} píxeles²")
+                
+            elif opcion == "3":  # Cálculo de perímetro de objetos
+                img_resultado, perimetros = self.analisis_prop.calcular_perimetro_objetos(
+                    self.imagen_activa, umbral=umbral, min_area=min_area)
+                
+                self.imagen_procesada = img_resultado
+                self.mostrar_imagen_procesada(f"Perímetros de objetos (Total: {len(perimetros)})")
+                
+                if perimetros:
+                    print("\nPerímetros de objetos detectados:")
+                    for i, perimetro in enumerate(perimetros, 1):
+                        print(f"Objeto #{i}: {int(perimetro)} píxeles")
+                
+            elif opcion == "4":  # Detección de centroides
+                img_resultado, centroides = self.analisis_prop.detectar_centroides(
+                    self.imagen_activa, umbral=umbral, min_area=min_area)
+                
+                self.imagen_procesada = img_resultado
+                self.mostrar_imagen_procesada(f"Centroides de objetos (Total: {len(centroides)})")
+                
+                if centroides:
+                    print("\nCentroides de objetos detectados:")
+                    for i, centro in enumerate(centroides, 1):
+                        print(f"Objeto #{i}: ({centro[0]}, {centro[1]})")
+                
+            elif opcion == "5":  # Orientación de objetos
+                img_resultado, orientaciones = self.analisis_prop.calcular_orientacion_objetos(
+                    self.imagen_activa, umbral=umbral, min_area=min_area)
+                
+                self.imagen_procesada = img_resultado
+                self.mostrar_imagen_procesada(f"Orientación de objetos (Total: {len(orientaciones)})")
+                
+                if orientaciones:
+                    print("\nOrientaciones de objetos detectados (grados):")
+                    for i, angulo in enumerate(orientaciones, 1):
+                        print(f"Objeto #{i}: {angulo:.2f}°")
+                
+            elif opcion == "6":  # Bounding box de objetos
+                img_resultado, bboxes = self.analisis_prop.obtener_bounding_boxes(
+                    self.imagen_activa, umbral=umbral, min_area=min_area)
+                
+                self.imagen_procesada = img_resultado
+                self.mostrar_imagen_procesada(f"Bounding boxes de objetos (Total: {len(bboxes)})")
+                
+                if bboxes:
+                    print("\nBounding boxes de objetos detectados (x, y, ancho, alto):")
+                    for i, bbox in enumerate(bboxes, 1):
+                        print(f"Objeto #{i}: {bbox}")
+                
+            elif opcion == "7":  # Extracción de múltiples propiedades
+                img_resultado, propiedades = self.analisis_prop.extraer_multiples_propiedades(
+                    self.imagen_activa, umbral=umbral, min_area=min_area)
+                
+                self.imagen_procesada = img_resultado
+                self.mostrar_imagen_procesada(f"Análisis de propiedades (Total: {len(propiedades)} objetos)")
+                
+                if propiedades:
+                    print("\nResumen de propiedades de objetos detectados:")
+                    for prop in propiedades:
+                        print(f"\nObjeto #{prop['id']}:")
+                        print(f"  - Área: {int(prop['area'])} píxeles²")
+                        print(f"  - Perímetro: {int(prop['perimetro'])} píxeles")
+                        print(f"  - Centroide: {prop['centroide']}")
+                        print(f"  - Orientación: {prop['orientacion']:.2f}°")
+                        print(f"  - Bounding Box (x,y,w,h): {prop['bbox']}")
+            else:
+                print("\nOpción no válida. Intente nuevamente.")
+                
+        except Exception as e:
+            print(f"\nError en el análisis de propiedades: {e}")
+            import traceback
+            traceback.print_exc()
 
 def main():
     """
@@ -682,7 +1432,7 @@ def main():
     """
     parser = argparse.ArgumentParser(description='Procesamiento de imágenes')
     
-    parser.add_argument('--dir-imagenes', type=str, default='images',
+    parser.add_argument('--dir-imagenes', type=str, default='imgs',
                         help='Directorio donde se encuentran las imágenes')
     
     parser.add_argument('--dir-resultados', type=str, default='resultados',
