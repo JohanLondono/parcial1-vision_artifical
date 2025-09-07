@@ -142,3 +142,144 @@ class OperacionesMorfologicas:
         """
         kernel = OperacionesMorfologicas.crear_kernel(kernel_forma, kernel_size)
         return cv2.morphologyEx(imagen, cv2.MORPH_BLACKHAT, kernel)
+    
+    @staticmethod
+    def eliminar_ruido_binaria(imagen, metodo='apertura', kernel_size=5, kernel_forma='rectangulo'):
+        """
+        Elimina ruido en una imagen binaria usando operaciones morfológicas.
+        
+        Args:
+            imagen: Imagen binaria
+            metodo: Método a utilizar ('apertura' o 'cierre')
+            kernel_size: Tamaño del kernel
+            kernel_forma: Forma del kernel ('rectangulo', 'elipse', 'cruz')
+            
+        Returns:
+            Imagen binaria con ruido eliminado
+        """
+        # Asegurar que la imagen sea binaria
+        if len(imagen.shape) > 2:
+            imagen_gris = cv2.cvtColor(imagen, cv2.COLOR_BGR2GRAY)
+            _, imagen_bin = cv2.threshold(imagen_gris, 127, 255, cv2.THRESH_BINARY)
+        else:
+            _, imagen_bin = cv2.threshold(imagen, 127, 255, cv2.THRESH_BINARY)
+        
+        # Aplicar operación morfológica según el método elegido
+        if metodo.lower() == 'apertura':
+            return OperacionesMorfologicas.apertura(imagen_bin, kernel_size, 1, kernel_forma)
+        elif metodo.lower() == 'cierre':
+            return OperacionesMorfologicas.cierre(imagen_bin, kernel_size, 1, kernel_forma)
+        else:
+            raise ValueError("Método no reconocido. Use 'apertura' o 'cierre'")
+    
+    @staticmethod
+    def extraer_contornos_morfologicos(imagen, kernel_size=3, kernel_forma='rectangulo'):
+        """
+        Extrae contornos de una imagen binaria usando operaciones morfológicas.
+        
+        Args:
+            imagen: Imagen binaria o en escala de grises
+            kernel_size: Tamaño del kernel
+            kernel_forma: Forma del kernel ('rectangulo', 'elipse', 'cruz')
+            
+        Returns:
+            Imagen con los contornos extraídos
+        """
+        # Asegurar que la imagen sea binaria
+        if len(imagen.shape) > 2:
+            imagen_gris = cv2.cvtColor(imagen, cv2.COLOR_BGR2GRAY)
+            _, imagen_bin = cv2.threshold(imagen_gris, 127, 255, cv2.THRESH_BINARY)
+        else:
+            _, imagen_bin = cv2.threshold(imagen, 127, 255, cv2.THRESH_BINARY)
+        
+        # Crear kernel
+        kernel = OperacionesMorfologicas.crear_kernel(kernel_forma, kernel_size)
+        
+        # Aplicar dilatación
+        dilatada = cv2.dilate(imagen_bin, kernel, iterations=1)
+        
+        # Extraer contornos (dilatación - original)
+        contornos = cv2.subtract(dilatada, imagen_bin)
+        
+        return contornos
+    
+    @staticmethod
+    def esqueletizacion(imagen):
+        """
+        Aplica esqueletización a una imagen binaria.
+        
+        Args:
+            imagen: Imagen binaria
+            
+        Returns:
+            Imagen esqueletizada
+        """
+        # Asegurar que la imagen sea binaria
+        if len(imagen.shape) > 2:
+            imagen_gris = cv2.cvtColor(imagen, cv2.COLOR_BGR2GRAY)
+            _, imagen_bin = cv2.threshold(imagen_gris, 127, 255, cv2.THRESH_BINARY)
+        else:
+            _, imagen_bin = cv2.threshold(imagen, 127, 255, cv2.THRESH_BINARY)
+        
+        # Crear una copia para el resultado
+        esqueleto = np.zeros(imagen_bin.shape, np.uint8)
+        
+        # Implementación de esqueletización mediante sucesivas erosiones y aperturas
+        kernel = cv2.getStructuringElement(cv2.MORPH_CROSS, (3, 3))
+        img = imagen_bin.copy()
+        
+        while True:
+            # Aplicar erosión
+            eroded = cv2.erode(img, kernel)
+            
+            # Aplicar apertura
+            temp = cv2.dilate(eroded, kernel)
+            temp = cv2.subtract(img, temp)
+            
+            # Añadir al esqueleto
+            esqueleto = cv2.bitwise_or(esqueleto, temp)
+            
+            # Actualizar imagen para la próxima iteración
+            img = eroded.copy()
+            
+            # Verificar si la imagen está completamente erosionada
+            if cv2.countNonZero(img) == 0:
+                break
+        
+        return esqueleto
+    
+    @staticmethod
+    def rellenar_huecos(imagen):
+        """
+        Rellena huecos internos en una imagen binaria.
+        
+        Args:
+            imagen: Imagen binaria
+            
+        Returns:
+            Imagen con huecos internos rellenados
+        """
+        # Asegurar que la imagen sea binaria
+        if len(imagen.shape) > 2:
+            imagen_gris = cv2.cvtColor(imagen, cv2.COLOR_BGR2GRAY)
+            _, imagen_bin = cv2.threshold(imagen_gris, 127, 255, cv2.THRESH_BINARY)
+        else:
+            _, imagen_bin = cv2.threshold(imagen, 127, 255, cv2.THRESH_BINARY)
+        
+        # Crear una máscara de tamaño mayor para asegurar que el punto semilla esté fuera de la imagen
+        h, w = imagen_bin.shape
+        mascara = np.zeros((h+2, w+2), np.uint8)
+        
+        # Crear una copia de la imagen
+        relleno = imagen_bin.copy()
+        
+        # Punto semilla en la esquina (asumiendo que el fondo es negro)
+        cv2.floodFill(relleno, mascara, (0, 0), 255)
+        
+        # Invertir para obtener solo los huecos
+        relleno = cv2.bitwise_not(relleno)
+        
+        # Combinar la imagen original con los huecos rellenados
+        resultado = cv2.bitwise_or(imagen_bin, relleno)
+        
+        return resultado

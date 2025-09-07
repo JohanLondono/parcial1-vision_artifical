@@ -3,7 +3,7 @@ import numpy as np
 
 class OperacionesGeometricas:
     """
-    Clase para operaciones geométricas en imágenes y operaciones lógicas binarias.
+    Clase para operaciones geométricas en imágenes.
     """
     
     @staticmethod
@@ -115,44 +115,3 @@ class OperacionesGeometricas:
         M = cv2.getPerspectiveTransform(pts1, pts2)
         h, w = imagen.shape[:2]
         return cv2.warpPerspective(imagen, M, (w, h))
-    
-    @staticmethod
-    def operacion_and(imagen1, imagen2):
-        """
-        Realiza la operación lógica AND entre dos imágenes binarias.
-        
-        Args:
-            imagen1: Primera imagen binaria
-            imagen2: Segunda imagen binaria
-            
-        Returns:
-            Imagen resultante de la operación AND
-        """
-        return cv2.bitwise_and(imagen1, imagen2)
-    
-    @staticmethod
-    def operacion_or(imagen1, imagen2):
-        """
-        Realiza la operación lógica OR entre dos imágenes binarias.
-        
-        Args:
-            imagen1: Primera imagen binaria
-            imagen2: Segunda imagen binaria
-            
-        Returns:
-            Imagen resultante de la operación OR
-        """
-        return cv2.bitwise_or(imagen1, imagen2)
-    
-    @staticmethod
-    def operacion_not(imagen):
-        """
-        Realiza la operación lógica NOT en una imagen binaria.
-        
-        Args:
-            imagen: Imagen binaria de entrada
-            
-        Returns:
-            Imagen resultante de la operación NOT (inversión)
-        """
-        return cv2.bitwise_not(imagen)
