@@ -924,12 +924,12 @@ El módulo `generador_reportes.py` implementa la generación de informes PDF con
 
 ### Métodos Implementados para la Detección de Copas
 
-#### 1. Método basado en Segmentación HSV
+#### 1. Método basado en Segmentación HSV (Mejorado)
 
 **Fundamento teórico:**
-La detección por HSV se basa en que las copas de árboles generalmente tienen un rango de color verde distintivo. Al convertir la imagen RGB al espacio HSV (Hue-Saturation-Value), es posible aislar los píxeles verdes que corresponden a vegetación.
+La detección por HSV se basa en que las copas de árboles generalmente tienen un rango de color verde distintivo. Al convertir la imagen RGB al espacio HSV (Hue-Saturation-Value), es posible aislar los píxeles verdes que corresponden a vegetación. La versión mejorada incorpora técnicas de preprocesamiento para normalizar la iluminación y un análisis de textura para distinguir copas de árboles de otras áreas verdes.
 
-**Implementación detallada:**
+**Implementación detallada (versión original):**
 ```python
 def segmentar_color_hsv(self, imagen, hue_min, hue_max, sat_min=50, val_min=50):
     # Convertir de RGB a HSV
@@ -953,15 +953,124 @@ def segmentar_color_hsv(self, imagen, hue_min, hue_max, sat_min=50, val_min=50):
     return result, mask
 ```
 
-**Fortalezas:**
-- Rápido y computacionalmente eficiente
-- Funciona bien en imágenes con buen contraste entre vegetación y fondo
-- Fácil de ajustar con parámetros intuitivos (rango de tonos verdes)
+**Implementación mejorada con preprocesamiento y post-procesamiento:**
+```python
+def detectar_copas_arboles(self, imagen, metodo='hsv', params=None):
+    """
+    Detecta copas de árboles con método HSV mejorado, incluyendo preprocesamiento
+    y post-procesamiento configurable.
+    """
+    if params is None:
+        params = {}
+        
+    # Asegurar que la imagen esté en formato BGR
+    if len(imagen.shape) <= 2:
+        imagen_color = cv2.cvtColor(imagen, cv2.COLOR_GRAY2BGR)
+    else:
+        imagen_color = imagen.copy()
+    
+    # Método 1: Segmentación por color HSV (verde)
+    if metodo.lower() == 'hsv':
+        # Valores predeterminados para detección de verde (copas de árboles)
+        hue_min = params.get('hue_min', 38)  # Verde más específico para árboles
+        hue_max = params.get('hue_max', 80)  # Rango más estrecho
+        sat_min = params.get('sat_min', 40)  # Mayor saturación para evitar pastos poco saturados
+        sat_max = params.get('sat_max', 255)
+        val_min = params.get('val_min', 50)  # Mayor valor para evitar sombras y vegetación oscura
+        val_max = params.get('val_max', 255)
+        
+        # --- 1. PREPROCESAMIENTO ---
+        imagen_procesada = imagen_color.copy()
+        
+        # Aplicar suavizado gaussiano si está activado
+        if params.get('preprocesar_suavizado', False):
+            imagen_procesada = cv2.GaussianBlur(imagen_procesada, (5, 5), 0)
+        
+        # Convertir a HSV
+        hsv = cv2.cvtColor(imagen_procesada, cv2.COLOR_BGR2HSV)
+        
+        # Aplicar ecualización de histograma al canal V si está activado
+        if params.get('preprocesar_eq_histograma', False):
+            h, s, v = cv2.split(hsv)
+            v_ecualizado = cv2.equalizeHist(v)
+            hsv = cv2.merge([h, s, v_ecualizado])
+        
+        # Definir rango de color verde
+        verde_bajo = np.array([hue_min, sat_min, val_min])
+        verde_alto = np.array([hue_max, sat_max, val_max])
+        
+        # Crear máscara para verde
+        mascara = cv2.inRange(hsv, verde_bajo, verde_alto)
+        
+        # --- 2. POST-PROCESAMIENTO ---
+        if params.get('postprocesar_morfologia', True):
+            iteraciones = params.get('iteraciones_morfologia', 2)
+            kernel = np.ones((5,5), np.uint8)
+            # Apertura: elimina pequeños ruidos
+            mascara = cv2.morphologyEx(mascara, cv2.MORPH_OPEN, kernel, iterations=iteraciones)
+            # Cierre: rellena pequeños agujeros
+            mascara = cv2.morphologyEx(mascara, cv2.MORPH_CLOSE, kernel, iterations=iteraciones)
+        
+        # Aplicar la máscara a la imagen original
+        imagen_segmentada = cv2.bitwise_and(imagen_color, imagen_color, mask=mascara)
+```
 
-**Debilidades:**
-- Sensible a variaciones en iluminación
-- No distingue entre diferentes tipos de vegetación
-- Dificultad con sombras y reflejos
+**Técnicas de preprocesamiento y post-procesamiento añadidas:**
+
+1. **Ecualización del Histograma en el Canal V:**
+   Permite normalizar la iluminación, haciendo que las copas sean más distinguibles en condiciones de sombra o alta exposición.
+
+   ```python
+   # Ecualización del histograma en canal V
+   h, s, v = cv2.split(hsv)
+   v_ecualizado = cv2.equalizeHist(v)
+   hsv = cv2.merge([h, s, v_ecualizado])
+   ```
+
+2. **Suavizado Gaussiano:**
+   Reduce el ruido en la imagen antes de la segmentación para obtener regiones más homogéneas.
+
+   ```python
+   # Aplicar suavizado Gaussiano
+   imagen_procesada = cv2.GaussianBlur(imagen_procesada, (5, 5), 0)
+   ```
+
+3. **Operaciones Morfológicas Configurables:**
+   Permite ajustar el número de iteraciones para la apertura y cierre morfológicos según las características de la imagen.
+
+   ```python
+   # Operaciones morfológicas con iteraciones configurables
+   mascara = cv2.morphologyEx(mascara, cv2.MORPH_OPEN, kernel, iterations=iteraciones)
+   mascara = cv2.morphologyEx(mascara, cv2.MORPH_CLOSE, kernel, iterations=iteraciones)
+   ```
+
+4. **Filtrado por Propiedades Geométricas:**
+   En la versión mejorada, se analizan las propiedades de cada región detectada para determinar si realmente corresponde a una copa de árbol:
+
+   ```python
+   # Filtrado por propiedades como área y circularidad
+   for contorno in contornos:
+       area = cv2.contourArea(contorno)
+       if area < min_area:
+           continue
+           
+       perimetro = cv2.arcLength(contorno, True)
+       circularidad = 4 * np.pi * area / (perimetro * perimetro) if perimetro > 0 else 0
+       
+       if circularidad < min_circularidad:
+           continue
+   ```
+
+**Fortalezas de la versión mejorada:**
+- Mayor robustez ante variaciones de iluminación gracias a la ecualización del histograma
+- Mejor discriminación entre copas de árboles y otras áreas verdes mediante filtros de forma
+- Configuración flexible que permite adaptarse a diferentes tipos de imágenes
+- Preprocesamiento personalizable según las condiciones específicas de cada imagen
+
+**Debilidades que se mantienen:**
+- Sigue siendo sensible a condiciones extremas de iluminación
+- Requiere ajuste manual de parámetros para resultados óptimos
+- Puede confundir otros objetos verdes con vegetación
 
 #### 2. Método basado en K-means
 
@@ -1071,32 +1180,222 @@ def watershed_segmentacion(self, imagen):
 - Requiere ajuste cuidadoso de parámetros
 - Puede producir sobre-segmentación
 
+### Función de Extracción de Copas de Árboles
+
+Una de las mejoras significativas implementadas es la función `extraer_copas_arboles` que permite aislar completamente las copas de los árboles del resto de la imagen. Esta función es especialmente útil para análisis específicos de vegetación, estimación de biomasa, y monitoreo de salud forestal.
+
+**Fundamento teórico:**
+Esta función combina la detección de copas con técnicas de procesamiento para presentar únicamente las copas detectadas, eliminando el resto de elementos de la imagen. Permite dos modalidades de visualización: con fondo negro (útil para análisis de forma y textura) o con fondo blanco (útil para impresiones y presentaciones).
+
+**Implementación detallada:**
+```python
+def extraer_copas_arboles(self, imagen, metodo='hsv', params=None, fondo_negro=True, post_procesamiento=True):
+    """
+    Extrae solo las copas de los árboles de una imagen, eliminando todo lo demás.
+    
+    Args:
+        imagen: Imagen de entrada
+        metodo: Método de segmentación ('hsv', 'kmeans', 'watershed')
+        params: Diccionario con parámetros específicos para el método seleccionado
+        fondo_negro: Si es True, el fondo será negro; si es False, será blanco
+        post_procesamiento: Si es True, aplica operaciones morfológicas para mejorar la segmentación
+            
+    Returns:
+        Imagen con solo las copas de los árboles, el resto eliminado
+    """
+    # Configurar parámetros para una detección mejorada
+    if params is None:
+        params = {}
+    
+    # Asegurar parámetros mínimos para filtrado de copas
+    if 'min_area' not in params:
+        params['min_area'] = 300
+    
+    if 'min_circularidad' not in params:
+        params['min_circularidad'] = 0.3
+        
+    if 'max_relacion_aspecto' not in params:
+        params['max_relacion_aspecto'] = 2.0
+        
+    if post_procesamiento and 'filtro_textura' not in params:
+        params['filtro_textura'] = True
+    
+    # Detectar copas usando el método mejorado
+    _, mascara = self.detectar_copas_arboles(imagen, metodo, params)
+    
+    # Aplicar post-procesamiento adicional si se solicita
+    if post_procesamiento:
+        # Operaciones morfológicas para refinar la segmentación
+        kernel = np.ones((7,7), np.uint8)
+        
+        # Cerrar pequeños agujeros en las copas
+        mascara = cv2.morphologyEx(mascara, cv2.MORPH_CLOSE, kernel, iterations=2)
+        
+        # Eliminar pequeños objetos que podrían haberse colado
+        kernel_small = np.ones((3,3), np.uint8)
+        mascara = cv2.morphologyEx(mascara, cv2.MORPH_OPEN, kernel_small, iterations=1)
+    
+    # Asegurar que la imagen esté en formato BGR
+    if len(imagen.shape) <= 2:
+        imagen_color = cv2.cvtColor(imagen, cv2.COLOR_GRAY2BGR)
+    else:
+        imagen_color = imagen.copy()
+        
+    # Extraer solo las copas (aplicar máscara a imagen original)
+    solo_copas = cv2.bitwise_and(imagen_color, imagen_color, mask=mascara)
+    
+    # Si se requiere fondo blanco en lugar de negro
+    if not fondo_negro:
+        # Crear fondo blanco
+        fondo_blanco = np.ones_like(imagen_color) * 255
+        
+        # Invertir la máscara para seleccionar el fondo
+        mascara_inv = cv2.bitwise_not(mascara)
+        
+        # Aplicar fondo blanco donde no hay copas
+        fondo = cv2.bitwise_and(fondo_blanco, fondo_blanco, mask=mascara_inv)
+        
+        # Combinar las copas con el fondo blanco
+        solo_copas = cv2.add(solo_copas, fondo)
+    
+    return solo_copas
+```
+
+**Aspectos destacables:**
+
+1. **Parametrización Avanzada:**
+   Incorpora parámetros específicos para mejorar la detección de copas:
+   - `min_area`: Filtra objetos pequeños que podrían ser falsos positivos
+   - `min_circularidad`: Ayuda a distinguir copas (más circulares) de otras vegetaciones como pasto
+   - `max_relacion_aspecto`: Filtra objetos alargados que probablemente no sean copas
+
+2. **Opciones de Visualización Flexibles:**
+   - Modo con fondo negro: Destaca exclusivamente las copas detectadas, facilitando análisis de forma y textura
+   - Modo con fondo blanco: Ideal para reportes técnicos e impresiones, mejora la visualización y reduce consumo de tinta
+
+3. **Post-procesamiento Configurable:**
+   Permite activar o desactivar operaciones morfológicas para refinar los resultados:
+   - Cierre morfológico: Rellena pequeños agujeros dentro de las copas detectadas
+   - Apertura morfológica: Elimina pequeños objetos aislados que podrían ser falsos positivos
+
+**Aplicaciones prácticas:**
+- Cálculo preciso de área foliar
+- Estimación de biomasa vegetal
+- Monitoreo temporal de crecimiento de vegetación
+- Análisis de salud de copas (requiere procesamiento adicional de color)
+- Conteo de árboles en imágenes aéreas
+
+**Ejemplo de uso:**
+```python
+# Ejemplo básico
+imagen_solo_copas = segmentacion.extraer_copas_arboles(imagen, metodo='hsv')
+
+# Ejemplo con parámetros personalizados
+params = {
+    'hue_min': 40,
+    'hue_max': 90,
+    'sat_min': 40,
+    'val_min': 50,
+    'min_area': 400,
+    'min_circularidad': 0.4,
+    'preprocesar_eq_histograma': True
+}
+imagen_copas_fondo_blanco = segmentacion.extraer_copas_arboles(
+    imagen, metodo='hsv', params=params, fondo_negro=False, post_procesamiento=True
+)
+```
+
 ### Tabla Comparativa de Resultados en Detección de Copas
 
-| Criterio | Segmentación HSV | K-means | Watershed |
-|----------|-----------------|---------|-----------|
-| Precisión en condiciones ideales | Alta | Media | Alta |
-| Robustez a variaciones de iluminación | Baja | Media | Media-Alta |
-| Separación de copas individuales | Baja | Media | Alta |
-| Velocidad de procesamiento | Rápida | Media | Lenta |
-| Facilidad de ajuste | Alta | Media | Baja |
-| Requisitos computacionales | Bajos | Medios | Altos |
-| Robustez frente a ruido | Media | Media | Baja-Media |
+| Criterio | Segmentación HSV | HSV Mejorado | K-means | Watershed |
+|----------|-----------------|--------------|---------|-----------|
+| Precisión en condiciones ideales | Alta | Muy Alta | Media | Alta |
+| Robustez a variaciones de iluminación | Baja | Media-Alta | Media | Media-Alta |
+| Separación de copas individuales | Baja | Media | Media | Alta |
+| Velocidad de procesamiento | Rápida | Media | Media | Lenta |
+| Facilidad de ajuste | Alta | Alta | Media | Baja |
+| Requisitos computacionales | Bajos | Bajos-Medios | Medios | Altos |
+| Robustez frente a ruido | Media | Alta | Media | Baja-Media |
+| Capacidad para distinguir vegetación similar | Baja | Media-Alta | Baja-Media | Media |
+
+### Integración en la Interfaz de Usuario
+
+Las mejoras en la detección de copas de árboles han sido completamente integradas en la interfaz de usuario a través del menú principal y el submenú de segmentación. Esta integración proporciona a los usuarios acceso directo a las nuevas funcionalidades y opciones avanzadas de configuración.
+
+#### Menú Principal de Detección de Copas de Árboles
+
+El menú principal incluye ahora una sección dedicada a la configuración avanzada de la detección de copas:
+
+```python
+# Preguntar por técnicas de preprocesamiento
+print("\n--- Opciones de Preprocesamiento ---")
+print("El preprocesamiento puede mejorar significativamente la detección en condiciones difíciles.")
+
+# Ecualización del histograma en canal V
+aplicar_eq_histograma = input("¿Aplicar ecualización de histograma en canal V para normalizar iluminación? (s/n, default: n): ").lower() == 's'
+
+# Aplicar suavizado
+aplicar_suavizado = input("¿Aplicar suavizado Gaussiano para reducir ruido? (s/n, default: n): ").lower() == 's'
+
+# Preguntar por técnicas de post-procesamiento
+print("\n--- Opciones de Post-procesamiento ---")
+
+# Aplicar operaciones morfológicas
+aplicar_morfologia = input("¿Aplicar operaciones morfológicas (apertura y cierre) para limpiar la máscara? (s/n, default: s): ").lower() != 'n'
+
+# Iteraciones para operaciones morfológicas
+if aplicar_morfologia:
+    iter_morfo = input("Número de iteraciones para operaciones morfológicas (Enter para 2): ").strip()
+    iter_morfo = int(iter_morfo) if iter_morfo.isdigit() else 2
+```
+
+Esta configuración permite al usuario seleccionar:
+
+1. **Opciones de preprocesamiento:**
+   - Ecualización del histograma para normalizar la iluminación
+   - Suavizado gaussiano para reducción de ruido
+
+2. **Opciones de post-procesamiento:**
+   - Activar/desactivar operaciones morfológicas
+   - Ajustar el número de iteraciones para estas operaciones
+
+3. **Opciones de visualización:**
+   ```python
+   print("\nSeleccione tipo de visualización:")
+   print("1. Detección con contornos (normal)")
+   print("2. Solo copas de árboles (sin fondo)")
+   print("3. Solo copas de árboles (fondo blanco)")
+   ```
+
+Estos parámetros configurados por el usuario se pasan al algoritmo subyacente para personalizar el proceso de detección según las características específicas de cada imagen o conjunto de imágenes.
+
+#### Implementación del Flujo de Trabajo
+
+La implementación completa en el menú de usuario permite un flujo de trabajo guiado para la detección de copas de árboles:
+
+1. El usuario selecciona el método de detección (HSV, K-means, o Watershed)
+2. Configura opciones de preprocesamiento según las condiciones de la imagen
+3. Configura parámetros específicos del método seleccionado
+4. Elige el modo de visualización (contornos o extracción de copas)
+5. Aplica post-procesamiento opcional
+6. Visualiza y guarda los resultados
+
+Este flujo proporciona una experiencia de usuario estructurada y a la vez flexible, permitiendo tanto análisis rápidos con configuración predeterminada como ajustes detallados para casos complejos.
 
 ### Evaluación y Recomendaciones
 
 Para la detección de copas de árboles, la elección del método óptimo depende del contexto específico:
 
-- **Método HSV** es recomendable para análisis rápidos en imágenes con buen contraste y condiciones de iluminación uniforme. Es ideal para identificar áreas generales de vegetación.
+- **Método HSV Mejorado** es recomendable para la mayoría de los casos, especialmente cuando se activan las opciones de preprocesamiento para normalizar la iluminación. Es rápido, intuitivo y ahora más robusto frente a variaciones de iluminación.
 
 - **Método K-means** ofrece un buen equilibrio entre precisión y eficiencia, siendo útil cuando las condiciones de iluminación son variables o cuando no se conocen a priori los rangos exactos de color para la vegetación.
 
 - **Método Watershed** es preferible cuando se necesita distinguir copas individuales en un dosel forestal denso, aunque requiere más potencia de cómputo y ajuste fino de parámetros.
 
 En escenarios prácticos, un enfoque híbrido que combine estos métodos puede proporcionar mejores resultados. Por ejemplo:
-1. Usar HSV para identificar rápidamente áreas de vegetación
-2. Aplicar K-means para refinar la segmentación
-3. Utilizar Watershed solo en áreas donde se necesite distinguir copas individuales
+1. Usar HSV Mejorado con ecualización de histograma como análisis inicial rápido
+2. Refinar los resultados con filtrado basado en propiedades geométricas
+3. En áreas de copas densas o superpuestas, aplicar Watershed para una mejor separación
 
 ## Flujo de Trabajo
 

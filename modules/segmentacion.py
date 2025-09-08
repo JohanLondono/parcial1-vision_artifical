@@ -318,8 +318,21 @@ class Segmentacion:
             val_min = params.get('val_min', 30)  # Valor mínimo para excluir sombras
             val_max = params.get('val_max', 255)
             
+            # --- 1. PREPROCESAMIENTO ---
+            imagen_procesada = imagen_color.copy()
+            
+            # Aplicar suavizado gaussiano si está activado
+            if params.get('preprocesar_suavizado', False):
+                imagen_procesada = cv2.GaussianBlur(imagen_procesada, (5, 5), 0)
+            
             # Convertir a HSV
-            hsv = cv2.cvtColor(imagen_color, cv2.COLOR_BGR2HSV)
+            hsv = cv2.cvtColor(imagen_procesada, cv2.COLOR_BGR2HSV)
+            
+            # Aplicar ecualización de histograma al canal V si está activado
+            if params.get('preprocesar_eq_histograma', False):
+                h, s, v = cv2.split(hsv)
+                v_ecualizado = cv2.equalizeHist(v)
+                hsv = cv2.merge([h, s, v_ecualizado])
             
             # Definir rango de color verde
             verde_bajo = np.array([hue_min, sat_min, val_min])
@@ -328,10 +341,14 @@ class Segmentacion:
             # Crear máscara para verde
             mascara = cv2.inRange(hsv, verde_bajo, verde_alto)
             
-            # Aplicar operaciones morfológicas para mejorar la segmentación
-            kernel = np.ones((5,5), np.uint8)
-            mascara = cv2.morphologyEx(mascara, cv2.MORPH_CLOSE, kernel, iterations=2)
-            mascara = cv2.morphologyEx(mascara, cv2.MORPH_OPEN, kernel, iterations=1)
+            # --- 2. POST-PROCESAMIENTO ---
+            if params.get('postprocesar_morfologia', True):
+                iteraciones = params.get('iteraciones_morfologia', 2)
+                kernel = np.ones((5,5), np.uint8)
+                # Apertura: elimina pequeños ruidos
+                mascara = cv2.morphologyEx(mascara, cv2.MORPH_OPEN, kernel, iterations=iteraciones)
+                # Cierre: rellena pequeños agujeros
+                mascara = cv2.morphologyEx(mascara, cv2.MORPH_CLOSE, kernel, iterations=iteraciones)
             
             # Aplicar la máscara a la imagen original
             imagen_segmentada = cv2.bitwise_and(imagen_color, imagen_color, mask=mascara)
@@ -429,3 +446,56 @@ class Segmentacion:
         cv2.drawContours(imagen_contornos, contornos, -1, (0, 255, 0), 2)
         
         return imagen_contornos, mascara
+    
+    def extraer_copas_arboles(self, imagen, metodo='hsv', params=None, fondo_negro=True, post_procesamiento=True):
+        """
+        Extrae solo las copas de los árboles de una imagen, eliminando todo lo demás.
+        
+        Args:
+            imagen: Imagen de entrada
+            metodo: Método de segmentación ('hsv', 'kmeans', 'watershed')
+            params: Diccionario con parámetros específicos para el método seleccionado
+            fondo_negro: Si es True, el fondo será negro; si es False, será blanco
+            post_procesamiento: Si es True, aplica operaciones morfológicas para mejorar la segmentación
+            
+        Returns:
+            Imagen con solo las copas de los árboles, el resto eliminado
+        """
+        # Detectar copas usando el método existente
+        _, mascara = self.detectar_copas_arboles(imagen, metodo, params)
+        
+        # Aplicar post-procesamiento si se solicita
+        if post_procesamiento:
+            # Operaciones morfológicas para mejorar la segmentación
+            kernel = np.ones((5,5), np.uint8)
+            
+            # Cerrar pequeños agujeros en las copas
+            mascara = cv2.morphologyEx(mascara, cv2.MORPH_CLOSE, kernel, iterations=2)
+            
+            # Eliminar pequeños objetos que no son árboles
+            mascara = cv2.morphologyEx(mascara, cv2.MORPH_OPEN, kernel, iterations=1)
+        
+        # Asegurar que la imagen esté en formato BGR
+        if len(imagen.shape) <= 2:
+            imagen_color = cv2.cvtColor(imagen, cv2.COLOR_GRAY2BGR)
+        else:
+            imagen_color = imagen.copy()
+            
+        # Extraer solo las copas (aplicar máscara a imagen original)
+        solo_copas = cv2.bitwise_and(imagen_color, imagen_color, mask=mascara)
+        
+        # Si se requiere fondo blanco en lugar de negro
+        if not fondo_negro:
+            # Crear fondo blanco
+            fondo_blanco = np.ones_like(imagen_color) * 255
+            
+            # Invertir la máscara para seleccionar el fondo
+            mascara_inv = cv2.bitwise_not(mascara)
+            
+            # Aplicar fondo blanco donde no hay copas
+            fondo = cv2.bitwise_and(fondo_blanco, fondo_blanco, mask=mascara_inv)
+            
+            # Combinar las copas con el fondo blanco
+            solo_copas = cv2.add(solo_copas, fondo)
+        
+        return solo_copas

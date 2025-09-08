@@ -864,6 +864,31 @@ class MenuAplicacion:
                 params = {}
             else:
                 metodo = "hsv"
+                
+                # Preguntar por técnicas de preprocesamiento
+                print("\n--- Opciones de Preprocesamiento ---")
+                print("El preprocesamiento puede mejorar significativamente la detección en condiciones difíciles.")
+                
+                # Ecualización del histograma en canal V
+                aplicar_eq_histograma = input("¿Aplicar ecualización de histograma en canal V para normalizar iluminación? (s/n, default: n): ").lower() == 's'
+                
+                # Aplicar suavizado
+                aplicar_suavizado = input("¿Aplicar suavizado Gaussiano para reducir ruido? (s/n, default: n): ").lower() == 's'
+                
+                # Preguntar por técnicas de post-procesamiento
+                print("\n--- Opciones de Post-procesamiento ---")
+                
+                # Aplicar operaciones morfológicas
+                aplicar_morfologia = input("¿Aplicar operaciones morfológicas (apertura y cierre) para limpiar la máscara? (s/n, default: s): ").lower() != 'n'
+                
+                # Iteraciones para operaciones morfológicas
+                if aplicar_morfologia:
+                    iter_morfo = input("Número de iteraciones para operaciones morfológicas (Enter para 2): ").strip()
+                    iter_morfo = int(iter_morfo) if iter_morfo.isdigit() else 2
+                else:
+                    iter_morfo = 0
+                
+                # Solicitar parámetros HSV
                 print("\nRangos para detección de verde (copas de árboles):")
                 print("Tono (Hue): típicamente 35-85 para verde")
                 hue_min = input("Tono mínimo (Enter para 35): ").strip()
@@ -874,25 +899,52 @@ class MenuAplicacion:
                 sat_min = input("Saturación mínima (Enter para 30): ").strip()
                 sat_min = int(sat_min) if sat_min.isdigit() else 30
                 
+                val_min = input("Valor mínimo (Enter para 30): ").strip()
+                val_min = int(val_min) if val_min.isdigit() else 30
+                
                 params = {
                     'hue_min': hue_min,
                     'hue_max': hue_max,
-                    'sat_min': sat_min
+                    'sat_min': sat_min,
+                    'val_min': val_min,
+                    'preprocesar_eq_histograma': aplicar_eq_histograma,
+                    'preprocesar_suavizado': aplicar_suavizado,
+                    'postprocesar_morfologia': aplicar_morfologia,
+                    'iteraciones_morfologia': iter_morfo
                 }
             
             try:
-                img_contornos, mascara = self.segmentacion.detectar_copas_arboles(
-                    self.imagen_procesada, metodo, params)
+                print("\nSeleccione tipo de visualización:")
+                print("1. Detección con contornos (normal)")
+                print("2. Solo copas de árboles (sin fondo)")
+                print("3. Solo copas de árboles (fondo blanco)")
                 
-                # Mostrar resultado con contornos
-                self.imagen_procesada = img_contornos
-                self.mostrar_imagen_procesada(f"Detección de copas de árboles ({metodo})")
+                vis_opcion = input("\nSeleccione una opción: ").strip()
                 
-                # Opción para ver solo la máscara
-                ver_mascara = input("\n¿Desea ver la máscara de segmentación? (s/n): ").lower()
-                if ver_mascara == 's' or ver_mascara == 'si':
-                    self.imagen_procesada = mascara
-                    self.mostrar_imagen_procesada("Máscara de copas de árboles")
+                if vis_opcion == "2" or vis_opcion == "3":
+                    # Extraer solo las copas de los árboles
+                    fondo_negro = (vis_opcion == "2")
+                    post_procesamiento = input("\n¿Aplicar post-procesamiento para mejorar resultados? (s/n, default: s): ").lower() != "n"
+                    
+                    self.imagen_procesada = self.segmentacion.extraer_copas_arboles(
+                        self.imagen_procesada, metodo, params, fondo_negro, post_procesamiento)
+                    
+                    tipo_fondo = "fondo negro" if fondo_negro else "fondo blanco"
+                    self.mostrar_imagen_procesada(f"Solo copas de árboles ({metodo}, {tipo_fondo})")
+                else:
+                    # Detección normal con contornos
+                    img_contornos, mascara = self.segmentacion.detectar_copas_arboles(
+                        self.imagen_procesada, metodo, params)
+                    
+                    # Mostrar resultado con contornos
+                    self.imagen_procesada = img_contornos
+                    self.mostrar_imagen_procesada(f"Detección de copas de árboles ({metodo})")
+                    
+                    # Opción para ver solo la máscara
+                    ver_mascara = input("\n¿Desea ver la máscara de segmentación? (s/n): ").lower()
+                    if ver_mascara == 's' or ver_mascara == 'si':
+                        self.imagen_procesada = mascara
+                        self.mostrar_imagen_procesada("Máscara de copas de árboles")
                     
             except Exception as e:
                 print(f"Error al detectar copas de árboles: {e}")
@@ -1245,6 +1297,31 @@ class MenuAplicacion:
         
         if opcion == "1":
             metodo = "hsv"
+            
+            # Preguntar por técnicas de preprocesamiento
+            print("\n--- Opciones de Preprocesamiento ---")
+            print("El preprocesamiento puede mejorar significativamente la detección en condiciones difíciles.")
+            
+            # Ecualización del histograma en canal V
+            aplicar_eq_histograma = input("¿Aplicar ecualización de histograma en canal V para normalizar iluminación? (s/n, default: n): ").lower() == 's'
+            
+            # Aplicar suavizado
+            aplicar_suavizado = input("¿Aplicar suavizado Gaussiano para reducir ruido? (s/n, default: n): ").lower() == 's'
+            
+            # Preguntar por técnicas de post-procesamiento
+            print("\n--- Opciones de Post-procesamiento ---")
+            
+            # Aplicar operaciones morfológicas
+            aplicar_morfologia = input("¿Aplicar operaciones morfológicas (apertura y cierre) para limpiar la máscara? (s/n, default: s): ").lower() != 'n'
+            
+            # Iteraciones para operaciones morfológicas
+            if aplicar_morfologia:
+                iter_morfo = input("Número de iteraciones para operaciones morfológicas (Enter para 2): ").strip()
+                iter_morfo = int(iter_morfo) if iter_morfo.isdigit() else 2
+            else:
+                iter_morfo = 0
+            
+            # Solicitar parámetros HSV
             print("\nRangos para detección de verde (copas de árboles):")
             print("Tono (Hue): típicamente 35-85 para verde")
             hue_min = input("Tono mínimo (Enter para 35): ").strip()
@@ -1262,7 +1339,11 @@ class MenuAplicacion:
                 'hue_min': hue_min,
                 'hue_max': hue_max,
                 'sat_min': sat_min,
-                'val_min': val_min
+                'val_min': val_min,
+                'preprocesar_eq_histograma': aplicar_eq_histograma,
+                'preprocesar_suavizado': aplicar_suavizado,
+                'postprocesar_morfologia': aplicar_morfologia,
+                'iteraciones_morfologia': iter_morfo
             }
             
         elif opcion == "2":
@@ -1279,19 +1360,37 @@ class MenuAplicacion:
             return
             
         try:
-            # Aplicar detección de copas de árboles
-            img_contornos, mascara = self.segmentacion.detectar_copas_arboles(
-                self.imagen_activa, metodo, params)
+            print("\nSeleccione tipo de visualización:")
+            print("1. Detección con contornos (normal)")
+            print("2. Solo copas de árboles (sin fondo)")
+            print("3. Solo copas de árboles (fondo blanco)")
             
-            # Mostrar resultado con contornos
-            self.imagen_procesada = img_contornos
-            self.mostrar_imagen_procesada(f"Detección de copas de árboles ({metodo})")
+            vis_opcion = input("\nSeleccione una opción: ").strip()
             
-            # Opción para ver también la máscara
-            ver_mascara = input("\n¿Desea ver la máscara de segmentación? (s/n): ").lower()
-            if ver_mascara == 's' or ver_mascara == 'si':
-                self.imagen_procesada = mascara
-                self.mostrar_imagen_procesada("Máscara de copas de árboles")
+            if vis_opcion == "2" or vis_opcion == "3":
+                # Extraer solo las copas de los árboles
+                fondo_negro = (vis_opcion == "2")
+                post_procesamiento = input("\n¿Aplicar post-procesamiento para mejorar resultados? (s/n, default: s): ").lower() != "n"
+                
+                self.imagen_procesada = self.segmentacion.extraer_copas_arboles(
+                    self.imagen_activa, metodo, params, fondo_negro, post_procesamiento)
+                
+                tipo_fondo = "fondo negro" if fondo_negro else "fondo blanco"
+                self.mostrar_imagen_procesada(f"Solo copas de árboles ({metodo}, {tipo_fondo})")
+            else:
+                # Detección normal con contornos
+                img_contornos, mascara = self.segmentacion.detectar_copas_arboles(
+                    self.imagen_activa, metodo, params)
+                
+                # Mostrar resultado con contornos
+                self.imagen_procesada = img_contornos
+                self.mostrar_imagen_procesada(f"Detección de copas de árboles ({metodo})")
+                
+                # Opción para ver también la máscara
+                ver_mascara = input("\n¿Desea ver la máscara de segmentación? (s/n): ").lower()
+                if ver_mascara == 's' or ver_mascara == 'si':
+                    self.imagen_procesada = mascara
+                    self.mostrar_imagen_procesada("Máscara de copas de árboles")
             
             # Opción para guardar los resultados
             guardar = input("\n¿Desea guardar los resultados? (s/n): ").lower()
