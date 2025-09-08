@@ -1,0 +1,2 @@
+wershell: mediana-nitidez-gaussiano-brillo 1.3
+HSV: Gaussiano-Suma-Contraste 1.2 (Importe el Brillo y Contrase)
